@@ -32,6 +32,10 @@ enum Binary {
     Biconditional,
 }
 
+trait Operation {
+    fn introduce(&self, assumptions: Vec<Rc<RefCell<Node>>>);
+}
+
 impl Fitch {
     fn new(mut premises: Vec<Expression>) -> Self {
         let root = Rc::new(RefCell::new(Node {
@@ -68,6 +72,13 @@ impl Fitch {
             self.lines.push(res);
         }
     }
+
+    fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
+        match sentence.introduce(&sentence, &assumptions) {
+            Err(_) => false,
+            Ok(reference) => todo!(),
+        }
+    }
 }
 
 impl Node {
@@ -95,5 +106,23 @@ impl Node {
             self.child = Some(result);
             return res;
         }
+    }
+}
+
+impl Expression {
+    fn introduce(&self, sentence: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        todo!()
+    }
+}
+
+impl Operation for Binary {
+    fn introduce(&self, assumptions: Vec<Rc<RefCell<Node>>>) {
+        todo!()
+    }
+}
+
+impl Operation for Unary {
+    fn introduce(&self, assumptions: Vec<Rc<RefCell<Node>>>) {
+        todo!()
     }
 }
