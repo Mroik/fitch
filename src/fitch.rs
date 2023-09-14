@@ -69,7 +69,7 @@ impl Fitch {
     }
 
     fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
-        match sentence.introduce(&sentence, &assumptions) {
+        match sentence.introduce(&assumptions) {
             Err(_) => false,
             Ok(reference) => todo!(),
         }
@@ -109,7 +109,7 @@ impl Node {
 }
 
 impl Expression {
-    fn introduce(&self, sentence: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce(&self, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         match self {
             Self::Binary(Binary::And, left, right) => {
                 return Binary::introduce_and((left.as_ref().clone(), right.as_ref().clone()), assumptions);
