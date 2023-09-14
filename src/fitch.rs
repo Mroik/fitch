@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 struct Fitch {
-    root: Rc<RefCell<Node>>,
+    root: Option<Rc<RefCell<Node>>>,
     lines: Vec<Rc<RefCell<Node>>>,
 }
 
@@ -49,14 +49,24 @@ impl Fitch {
                 lines.push(res);
                 return acc;
             });
-        return Fitch { root, lines };
+        return Fitch { root: Some(root), lines };
+    }
+
+    fn empty() -> Self {
+        return Fitch { root: None, lines: vec![] };
     }
 
     // Didn't plan ahead enough, this implementation can't have empty premises
     fn add_assumption(&mut self, assumption: Expression) {
-        let last = self.lines.last().unwrap();
-        let res = last.borrow_mut().add_child(assumption);
-        self.lines.push(res);
+        let last = self.lines.last();
+        if last.is_none() {
+            let exp = Rc::new(RefCell::new(Node::new(assumption)));
+            self.root = Some(exp.clone());
+            self.lines.push(exp);
+        } else {
+            let res = last.unwrap().borrow_mut().add_child(assumption);
+            self.lines.push(res);
+        }
     }
 }
 
