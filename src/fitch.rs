@@ -32,10 +32,6 @@ enum Binary {
     Biconditional,
 }
 
-trait Operation {
-    fn introduce(&self, operands: Vec<Expression>, assumptions: Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()>;
-}
-
 impl Fitch {
     fn new(mut premises: Vec<Expression>) -> Self {
         let root = Rc::new(RefCell::new(Node {
@@ -60,7 +56,6 @@ impl Fitch {
         return Fitch { root: None, lines: vec![] };
     }
 
-    // Didn't plan ahead enough, this implementation can't have empty premises
     fn add_assumption(&mut self, assumption: Expression) {
         let last = self.lines.last();
         if last.is_none() {
@@ -124,12 +119,6 @@ impl Expression {
     }
 }
 
-impl Operation for Binary {
-    fn introduce(&self, operands: Vec<Expression>, assumptions: Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
-        todo!()
-    }
-}
-
 impl Binary {
     fn introduce_and(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         if assumptions.len() != 2 { return Err(()) };
@@ -140,11 +129,5 @@ impl Binary {
             return Ok(Rc::new(RefCell::new(Node::new(Expression::Binary(Self::And, Box::new(left), Box::new(right))))));
         }
         return Err(());
-    }
-}
-
-impl Operation for Unary {
-    fn introduce(&self, operands: Vec<Expression>, assumptions: Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
-        todo!()
     }
 }
