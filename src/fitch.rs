@@ -11,7 +11,7 @@ struct Node {
     child: Option<Rc<RefCell<Node>>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Expression {
     Proposition(Box<str>),
     Unary(Unary, Box<Expression>),
@@ -19,12 +19,12 @@ enum Expression {
     Absurdum,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Unary {
     Not,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Binary {
     And,
     Or,
@@ -33,7 +33,7 @@ enum Binary {
 }
 
 trait Operation {
-    fn introduce(&self, assumptions: Vec<Rc<RefCell<Node>>>);
+    fn introduce(&self, operands: Vec<Expression>, assumptions: Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()>;
 }
 
 impl Fitch {
@@ -107,22 +107,44 @@ impl Node {
             return res;
         }
     }
+
+    fn value(&self) -> &Expression {
+        return &self.value;
+    }
 }
 
 impl Expression {
     fn introduce(&self, sentence: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
-        todo!()
+        match self {
+            Self::Binary(Binary::And, left, right) => {
+                return Binary::introduce_and((left.as_ref().clone(), right.as_ref().clone()), assumptions);
+            },
+            _ => todo!(),
+        }
     }
 }
 
 impl Operation for Binary {
-    fn introduce(&self, assumptions: Vec<Rc<RefCell<Node>>>) {
+    fn introduce(&self, operands: Vec<Expression>, assumptions: Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         todo!()
     }
 }
 
+impl Binary {
+    fn introduce_and(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        if assumptions.len() != 2 { return Err(()) };
+        let (left, right) = operands;
+        let a = left == *assumptions[0].as_ref().borrow().value() && right == *assumptions[1].as_ref().borrow().value();
+        let b = right == *assumptions[0].as_ref().borrow().value() && left == *assumptions[1].as_ref().borrow().value();
+        if a || b {
+            return Ok(Rc::new(RefCell::new(Node::new(Expression::Binary(Self::And, Box::new(left), Box::new(right))))));
+        }
+        return Err(());
+    }
+}
+
 impl Operation for Unary {
-    fn introduce(&self, assumptions: Vec<Rc<RefCell<Node>>>) {
+    fn introduce(&self, operands: Vec<Expression>, assumptions: Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         todo!()
     }
 }
