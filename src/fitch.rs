@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 struct Fitch {
     root: Rc<RefCell<Node>>,
-    lines: Vec<Expression>,
+    lines: Vec<Rc<RefCell<Node>>>,
 }
 
 struct Node {
@@ -33,23 +33,30 @@ enum Binary {
 }
 
 impl Fitch {
-    fn new(mut assumptions: Vec<Expression>) -> Self {
+    fn new(mut premises: Vec<Expression>) -> Self {
         let root = Rc::new(RefCell::new(Node {
-            value: assumptions.remove(0),
+            value: premises.remove(0),
             next: None,
             child: None,
         }));
         let mut lines = vec![];
-        lines.push(root.borrow().value.clone());
+        lines.push(root.clone());
 
-        let root = assumptions
+        let root = premises
             .iter()
             .fold(root, |acc, x| {
-                acc.borrow_mut().add_next(x.clone());
-                lines.push(x.clone());
+                let res = acc.borrow_mut().add_next(x.clone());
+                lines.push(res);
                 return acc;
             });
         return Fitch { root, lines };
+    }
+
+    // Didn't plan ahead enough, this implementation can't have empty premises
+    fn add_assumption(&mut self, assumption: Expression) {
+        let last = self.lines.last().unwrap();
+        let res = last.borrow_mut().add_child(assumption);
+        self.lines.push(res);
     }
 }
 
@@ -58,11 +65,25 @@ impl Node {
         return Node { value, next: None, child: None };
     }
 
-    fn add_next(&mut self, next: Expression) {
+    fn add_next(&mut self, next: Expression) -> Rc<RefCell<Node>> {
         if let Some(x) = &self.next {
-            x.borrow_mut().add_next(next);
+            return x.borrow_mut().add_next(next);
         } else {
-            self.next = Some(Rc::new(RefCell::new(Node::new(next))));
+            let result = Rc::new(RefCell::new(Node::new(next)));
+            let res = result.clone();
+            self.next = Some(result);
+            return res;
+        }
+    }
+
+    fn add_child(&mut self, child: Expression) -> Rc<RefCell<Node>> {
+        if let Some(x) = &self.child {
+            return x.borrow_mut().add_child(child);
+        } else {
+            let result = Rc::new(RefCell::new(Node::new(child)));
+            let res = result.clone();
+            self.child = Some(result);
+            return res;
         }
     }
 }
