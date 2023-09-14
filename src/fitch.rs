@@ -114,6 +114,9 @@ impl Expression {
             Self::Binary(Binary::And, left, right) => {
                 return Binary::introduce_and((left.as_ref().clone(), right.as_ref().clone()), assumptions);
             },
+            Self::Binary(Binary::Or, left, right) => {
+                return Binary::introduce_or((left.as_ref().clone(), right.as_ref().clone()), assumptions);
+            },
             _ => todo!(),
         }
     }
@@ -123,10 +126,22 @@ impl Binary {
     fn introduce_and(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         if assumptions.len() != 2 { return Err(()) };
         let (left, right) = operands;
-        let a = left == *assumptions[0].as_ref().borrow().value() && right == *assumptions[1].as_ref().borrow().value();
-        let b = right == *assumptions[0].as_ref().borrow().value() && left == *assumptions[1].as_ref().borrow().value();
+        let l = assumptions[0].as_ref().borrow();
+        let r = assumptions[1].as_ref().borrow();
+        let a = left == *l.value() && right == *r.value();
+        let b = right == *l.value() && left == *r.value();
         if a || b {
             return Ok(Rc::new(RefCell::new(Node::new(Expression::Binary(Self::And, Box::new(left), Box::new(right))))));
+        }
+        return Err(());
+    }
+
+    fn introduce_or(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        if assumptions.len() != 1 { return Err(()) };
+        let (left, right) = operands;
+        let value = assumptions[0].borrow();
+        if left == *value.value() || right == *value.value() {
+            return Ok(Rc::new(RefCell::new(Node::new(Expression::Binary(Self::Or, Box::new(left), Box::new(right))))));
         }
         return Err(());
     }
