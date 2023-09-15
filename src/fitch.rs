@@ -9,6 +9,8 @@ struct Node {
     value: Expression,
     next: Option<Rc<RefCell<Node>>>,
     child: Option<Rc<RefCell<Node>>>,
+    prev: Option<Rc<RefCell<Node>>>,
+    parent: Option<Rc<RefCell<Node>>>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -38,6 +40,8 @@ impl Fitch {
             value: premises.remove(0),
             next: None,
             child: None,
+            prev: None,
+            parent: None,
         }));
         let mut lines = vec![];
         lines.push(root.clone());
@@ -45,7 +49,7 @@ impl Fitch {
         let root = premises
             .iter()
             .fold(root, |acc, x| {
-                let res = acc.borrow_mut().add_next(x.clone());
+                let res = acc.borrow_mut().add_next(acc.clone(), x.clone());
                 lines.push(res);
                 return acc;
             });
@@ -63,7 +67,8 @@ impl Fitch {
             self.root = Some(exp.clone());
             self.lines.push(exp);
         } else {
-            let res = last.unwrap().borrow_mut().add_child(assumption);
+            let last = last.unwrap();
+            let res = last.borrow_mut().add_child(last.clone(), assumption);
             self.lines.push(res);
         }
     }
@@ -78,25 +83,29 @@ impl Fitch {
 
 impl Node {
     fn new(value: Expression) -> Self {
-        return Node { value, next: None, child: None };
+        return Node { value, next: None, child: None, prev: None, parent: None };
     }
 
-    fn add_next(&mut self, next: Expression) -> Rc<RefCell<Node>> {
+    fn add_next(&mut self, self_rc: Rc<RefCell<Node>>, next: Expression) -> Rc<RefCell<Node>> {
         if let Some(x) = &self.next {
-            return x.borrow_mut().add_next(next);
+            return x.borrow_mut().add_next(self_rc, next);
         } else {
-            let result = Rc::new(RefCell::new(Node::new(next)));
+            let result = RefCell::new(Node::new(next));
+            result.borrow_mut().prev = Some(self_rc);
+            let result = Rc::new(result);
             let res = result.clone();
             self.next = Some(result);
             return res;
         }
     }
 
-    fn add_child(&mut self, child: Expression) -> Rc<RefCell<Node>> {
+    fn add_child(&mut self, self_rc: Rc<RefCell<Node>>, child: Expression) -> Rc<RefCell<Node>> {
         if let Some(x) = &self.child {
-            return x.borrow_mut().add_child(child);
+            return x.borrow_mut().add_child(self_rc, child);
         } else {
-            let result = Rc::new(RefCell::new(Node::new(child)));
+            let result = RefCell::new(Node::new(child));
+            result.borrow_mut().parent = Some(self_rc);
+            let result = Rc::new(result);
             let res = result.clone();
             self.child = Some(result);
             return res;
@@ -113,9 +122,38 @@ impl Node {
         }
         return self.next.as_ref().unwrap().borrow().last_expression();
     }
+
+    fn internal_available_sentences(&self, self_rc: Option<Rc<RefCell<Node>>>) -> Vec<Rc<RefCell<Node>>> {
+        if self.prev.is_some() {
+            let prev = self.prev.as_ref().unwrap();
+            let mut res = prev.borrow().internal_available_sentences(Some(prev.clone()));
+            if let Some(rc) = self_rc {
+                res.push(rc);
+            }
+            return res;
+        } else if self.parent.is_some() {
+            let parent = self.parent.as_ref().unwrap();
+            let mut res = parent.borrow().internal_available_sentences(Some(parent.clone()));
+            if let Some(rc) = self_rc {
+                res.push(rc);
+            }
+            return res;
+        } else {
+            let mut res = vec![];
+            if let Some(rc) = self_rc {
+                res.push(rc);
+            }
+            return res;
+        }
+    }
+
+    fn available_sentences(&self) -> Vec<Rc<RefCell<Node>>> {
+        return self.internal_available_sentences(None);
+    }
 }
 
 impl Expression {
+    // TODO Check if assumptions are within the available sentences
     fn introduce(&self, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         match self {
             Self::Binary(Binary::And, left, right) => {
@@ -124,6 +162,9 @@ impl Expression {
             Self::Binary(Binary::Or, left, right) => {
                 return Binary::introduce_or((left.as_ref().clone(), right.as_ref().clone()), assumptions);
             },
+            Self::Binary(Binary::Conditional, left, right) => {
+                return Binary::introduce_condition((left.as_ref().clone(), right.as_ref().clone()), assumptions)
+            }
             _ => todo!(),
         }
     }
