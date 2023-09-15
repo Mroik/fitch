@@ -106,6 +106,13 @@ impl Node {
     fn value(&self) -> &Expression {
         return &self.value;
     }
+
+    fn last_expression(&self) -> Expression {
+        if self.next.is_none() {
+            return self.value().clone();
+        }
+        return self.next.as_ref().unwrap().borrow().last_expression();
+    }
 }
 
 impl Expression {
@@ -123,6 +130,10 @@ impl Expression {
 }
 
 impl Binary {
+    fn generate_node(operator: Self, left: Expression, right: Expression) -> Rc<RefCell<Node>> {
+        return Rc::new(RefCell::new(Node::new(Expression::Binary(operator, Box::new(left), Box::new(right)))));
+    }
+
     fn introduce_and(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         if assumptions.len() != 2 { return Err(()) };
         let (left, right) = operands;
@@ -131,7 +142,7 @@ impl Binary {
         let a = left == *l.value() && right == *r.value();
         let b = right == *l.value() && left == *r.value();
         if a || b {
-            return Ok(Rc::new(RefCell::new(Node::new(Expression::Binary(Self::And, Box::new(left), Box::new(right))))));
+            return Ok(Self::generate_node(Self::And, left, right));
         }
         return Err(());
     }
@@ -141,7 +152,19 @@ impl Binary {
         let (left, right) = operands;
         let value = assumptions[0].borrow();
         if left == *value.value() || right == *value.value() {
-            return Ok(Rc::new(RefCell::new(Node::new(Expression::Binary(Self::Or, Box::new(left), Box::new(right))))));
+            return Ok(Self::generate_node(Self::Or, left, right));
+        }
+        return Err(());
+    }
+
+    fn introduce_condition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
+    -> Result<Rc<RefCell<Node>>, ()> {
+        if assumptions.len() != 1 {
+            return Err(());
+        }
+        let (left, right) = operands;
+        if left == *assumptions[0].borrow().value() && right == assumptions[0].borrow().last_expression() {
+            return Ok(Self::generate_node(Self::Conditional, left, right));
         }
         return Err(());
     }
