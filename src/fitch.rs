@@ -1,14 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
 struct Fitch {
-    root: Option<Rc<RefCell<Node>>>,
+    root: Rc<RefCell<Node>>,
     lines: Vec<Rc<RefCell<Node>>>,
 }
 
 struct Node {
     value: Expression,
     next: Option<Rc<RefCell<Node>>>,
-    child: Option<Rc<RefCell<Node>>>,
+    children: Vec<Rc<RefCell<Node>>>,
     prev: Option<Rc<RefCell<Node>>>,
     parent: Option<Rc<RefCell<Node>>>,
 }
@@ -19,6 +19,7 @@ enum Expression {
     Unary(Unary, Box<Expression>),
     Binary(Binary, Box<Expression>, Box<Expression>),
     Absurdum,
+    Empty,
 }
 
 #[derive(Clone, PartialEq)]
@@ -39,7 +40,7 @@ impl Fitch {
         let root = Rc::new(RefCell::new(Node {
             value: premises.remove(0),
             next: None,
-            child: None,
+            children: vec![],
             prev: None,
             parent: None,
         }));
@@ -53,24 +54,18 @@ impl Fitch {
                 lines.push(res);
                 return acc;
             });
-        return Fitch { root: Some(root), lines };
+        return Fitch { root, lines };
     }
 
     fn empty() -> Self {
-        return Fitch { root: None, lines: vec![] };
+        return Fitch { root: Rc::new(RefCell::new(Node::new(Expression::Empty))), lines: vec![] };
     }
 
     fn add_assumption(&mut self, assumption: Expression) {
         let last = self.lines.last();
-        if last.is_none() {
-            let exp = Rc::new(RefCell::new(Node::new(assumption)));
-            self.root = Some(exp.clone());
-            self.lines.push(exp);
-        } else {
-            let last = last.unwrap();
-            let res = last.borrow_mut().add_child(last.clone(), assumption);
-            self.lines.push(res);
-        }
+        let last = last.unwrap();
+        let res = last.borrow_mut().add_child(last.clone(), assumption);
+        self.lines.push(res);
     }
 
     fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
@@ -83,7 +78,7 @@ impl Fitch {
 
 impl Node {
     fn new(value: Expression) -> Self {
-        return Node { value, next: None, child: None, prev: None, parent: None };
+        return Node { value, next: None, children: vec![], prev: None, parent: None };
     }
 
     fn add_next(&mut self, self_rc: Rc<RefCell<Node>>, next: Expression) -> Rc<RefCell<Node>> {
@@ -100,16 +95,10 @@ impl Node {
     }
 
     fn add_child(&mut self, self_rc: Rc<RefCell<Node>>, child: Expression) -> Rc<RefCell<Node>> {
-        if let Some(x) = &self.child {
-            return x.borrow_mut().add_child(self_rc, child);
-        } else {
-            let result = RefCell::new(Node::new(child));
-            result.borrow_mut().parent = Some(self_rc);
-            let result = Rc::new(result);
-            let res = result.clone();
-            self.child = Some(result);
-            return res;
-        }
+        let res = Rc::new(RefCell::new(Node::new(child)));
+        res.borrow_mut().parent = Some(self_rc);
+        self.children.push(res.clone());
+        return res;
     }
 
     fn value(&self) -> &Expression {
