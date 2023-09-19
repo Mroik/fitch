@@ -69,7 +69,8 @@ impl Fitch {
     }
 
     fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
-        match sentence.introduce(&assumptions) {
+        let available = self.lines.last().unwrap().borrow().available_sentences();
+        match sentence.introduce(available, &assumptions) {
             Err(_) => false,
             Ok(reference) => todo!(),
         }
@@ -142,18 +143,25 @@ impl Node {
 }
 
 impl Expression {
-    // TODO Check if assumptions are within the available sentences
-    fn introduce(&self, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+    fn is_available(available: &Vec<Rc<RefCell<Node>>>, exp: &Expression) -> bool {
+        return available.iter().any(|x| *x.borrow().value() == *exp);
+    }
+
+    fn introduce(&self, available: Vec<Rc<RefCell<Node>>>, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         match self {
-            Self::Binary(Binary::And, left, right) => {
-                return Binary::introduce_and((left.as_ref().clone(), right.as_ref().clone()), assumptions);
+            Self::Binary(oper, left, right) => {
+                if !(Self::is_available(&available, left) && Self::is_available(&available, right)) {
+                    return Err(());
+                }
+                let left = left.as_ref().clone();
+                let right = right.as_ref().clone();
+                match oper {
+                    Binary::And => Binary::introduce_and((left, right), assumptions),
+                    Binary::Or => Binary::introduce_or((left, right), assumptions),
+                    Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
+                    _ => todo!(),
+                }
             },
-            Self::Binary(Binary::Or, left, right) => {
-                return Binary::introduce_or((left.as_ref().clone(), right.as_ref().clone()), assumptions);
-            },
-            Self::Binary(Binary::Conditional, left, right) => {
-                return Binary::introduce_condition((left.as_ref().clone(), right.as_ref().clone()), assumptions)
-            }
             _ => todo!(),
         }
     }
