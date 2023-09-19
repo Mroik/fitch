@@ -15,7 +15,7 @@ struct Node {
 
 #[derive(Clone, PartialEq)]
 enum Expression {
-    Proposition(Box<str>),
+    Proposition(String),
     Unary(Unary, Box<Expression>),
     Binary(Binary, Box<Expression>, Box<Expression>),
     Absurdum,
@@ -205,5 +205,23 @@ impl Binary {
             return Ok(Self::generate_node(Self::Conditional, left, right));
         }
         return Err(());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{rc::Rc, cell::RefCell};
+
+    use super::{Binary, Expression, Node};
+
+    #[test]
+    fn introduce_and() {
+        let operands = (
+            Expression::Proposition(String::from("A")),
+            Expression::Proposition(String::from("B"))
+        );
+
+        let vv = Binary::introduce_and(operands.clone(), &vec![Rc::new(RefCell::new(Node::new(operands.0))), Rc::new(RefCell::new(Node::new(operands.1)))]);
+        assert!(vv.is_ok());
     }
 }
