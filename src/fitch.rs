@@ -13,7 +13,7 @@ struct Node {
     parent: Option<Rc<RefCell<Node>>>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Expression {
     Proposition(String),
     Unary(Unary, Box<Expression>),
@@ -22,12 +22,12 @@ enum Expression {
     Empty,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Unary {
     Not,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Binary {
     And,
     Or,
@@ -113,41 +113,41 @@ impl Node {
         return self.next.as_ref().unwrap().borrow().last_expression();
     }
 
-    fn internal_available_sentences(&self, self_rc: Option<Rc<RefCell<Node>>>) -> Vec<Rc<RefCell<Node>>> {
+    fn internal_available_sentences(&self, self_rc: Option<Rc<RefCell<Node>>>) -> Vec<Expression> {
         if self.prev.is_some() {
             let prev = self.prev.as_ref().unwrap();
             let mut res = prev.borrow().internal_available_sentences(Some(prev.clone()));
             if let Some(rc) = self_rc {
-                res.push(rc);
+                res.push(rc.borrow().value().clone());
             }
             return res;
         } else if self.parent.is_some() {
             let parent = self.parent.as_ref().unwrap();
             let mut res = parent.borrow().internal_available_sentences(Some(parent.clone()));
             if let Some(rc) = self_rc {
-                res.push(rc);
+                res.push(rc.borrow().value().clone());
             }
             return res;
         } else {
             let mut res = vec![];
             if let Some(rc) = self_rc {
-                res.push(rc);
+                res.push(rc.borrow().value().clone());
             }
             return res;
         }
     }
 
-    fn available_sentences(&self) -> Vec<Rc<RefCell<Node>>> {
+    fn available_sentences(&self) -> Vec<Expression> {
         return self.internal_available_sentences(None);
     }
 }
 
 impl Expression {
-    fn is_available(available: &Vec<Rc<RefCell<Node>>>, exp: &Expression) -> bool {
-        return available.iter().any(|x| *x.borrow().value() == *exp);
+    fn is_available(available: &Vec<Expression>, exp: &Expression) -> bool {
+        return available.iter().any(|x| x == exp);
     }
 
-    fn introduce(&self, available: Vec<Rc<RefCell<Node>>>, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce(&self, available: Vec<Expression>, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         match self {
             Self::Binary(oper, left, right) => {
                 if !(Self::is_available(&available, left) && Self::is_available(&available, right)) {
@@ -208,103 +208,146 @@ impl Binary {
     }
 }
 
-#[cfg(test)]
-mod test_binary {
-    use std::{rc::Rc, cell::RefCell};
-    use super::{Binary, Expression, Node};
+mod tests {
+    #[cfg(test)]
+    mod test_node {
+        use std::{rc::Rc, cell::RefCell, vec};
 
-    fn make_node(exp: Expression) -> Rc<RefCell<Node>> {
-        return Rc::new(RefCell::new(Node::new(exp)));
+        use crate::fitch::{Node, Expression, Binary};
+    
+        #[test]
+        fn available_sentences() {
+            let last = Expression::Absurdum;
+            let first = Rc::new(RefCell::new(Node::new(Expression::Binary(
+                    Binary::And,
+                    Box::new(Expression::Proposition(String::from("A"))),
+                    Box::new(Expression::Proposition(String::from("B"))))
+            )));
+            let second = Expression::Binary(
+                    Binary::Or,
+                    Box::new(Expression::Proposition(String::from("A"))),
+                    Box::new(Expression::Proposition(String::from("B")))
+            );
+            let third = Expression::Binary(
+                    Binary::Or,
+                    Box::new(Expression::Proposition(String::from("A"))),
+                    Box::new(Expression::Proposition(String::from("B")))
+            );
+
+            let second = first.borrow_mut().add_child(first.clone(), second);
+            let third = second.borrow_mut().add_child(second.clone(), third);
+            let last = third.borrow_mut().add_next(third.clone(), last);
+
+            let available = last.borrow().available_sentences();
+            let oracle = vec![
+                first.borrow().value().clone(),
+                second.borrow().value().clone(),
+                third.borrow().value().clone(),
+            ];
+
+            assert_eq!(available, oracle);
+        }
     }
+    
+    #[cfg(test)]
+    mod test_binary {
+        use std::{rc::Rc, cell::RefCell};
 
-    #[test]
-    fn introduce_and() {
-        let operands = (
-            Expression::Proposition(String::from("A")),
-            Expression::Proposition(String::from("B"))
-        );
-        let vv = Binary::introduce_and(
-            operands.clone(),
-            &vec![make_node(operands.0.clone()), make_node(operands.1.clone())]
-        );
-        assert!(vv.is_ok());
-
-        let vv = Binary::introduce_and(
-            operands.clone(),
-            &vec![make_node(operands.0.clone()), make_node(Expression::Empty)]
-        );
-        assert!(vv.is_err());
-
-        let vv = Binary::introduce_and(
-            operands.clone(),
-            &vec![make_node(Expression::Empty), make_node(operands.1.clone())]
-        );
-        assert!(vv.is_err());
-
-        let vv = Binary::introduce_and(
-            operands.clone(),
-            &vec![make_node(operands.1.clone()), make_node(operands.0.clone())]
-        );
-        assert!(vv.is_ok());
-    }
-
-    #[test]
-    fn introduce_or() {
-        let operands = (
-            Expression::Proposition(String::from("A")),
-            Expression::Proposition(String::from("B"))
-        );
-        let vv = Binary::introduce_or(
-            operands.clone(),
-            &vec![make_node(operands.0.clone())]
-        );
-        assert!(vv.is_ok());
-
-        let vv = Binary::introduce_or(
-            operands.clone(),
-            &vec![make_node(operands.1.clone())]
-        );
-        assert!(vv.is_ok());
-
-        let vv = Binary::introduce_or(
-            operands.clone(),
-            &vec![make_node(Expression::Absurdum)]
-        );
-        assert!(vv.is_err());
-    }
-
-    #[test]
-    fn introduce_condition() {
-        let operands = (
-            Expression::Proposition(String::from("A")),
-            Expression::Proposition(String::from("B"))
-        );
-
-        let assump = make_node(operands.0.clone());
-        assump.borrow_mut().add_next(assump.clone(), operands.1.clone());
-
-        let vv = Binary::introduce_condition(
-            operands.clone(),
-            &vec![assump]
-        );
-        assert!(vv.is_ok());
-
-        let assump = make_node(operands.0.clone());
-        assump.borrow_mut().add_next(assump.clone(), Expression::Absurdum);
-
-        let vv = Binary::introduce_condition(
-            operands.clone(),
-            &vec![assump]
-        );
-        assert!(vv.is_err());
-
-        let assump = make_node(Expression::Empty);
-        assump.borrow_mut().add_next(assump.clone(), operands.1.clone());
-
-        let vv = Binary::introduce_condition(
-            operands.clone(),
-            &vec![assump]
-        );
-        assert!(vv.is_err());
+        use crate::fitch::{Expression, Node, Binary};
+    
+        fn make_node(exp: Expression) -> Rc<RefCell<Node>> {
+            return Rc::new(RefCell::new(Node::new(exp)));
+        }
+    
+        #[test]
+        fn introduce_and() {
+            let operands = (
+                Expression::Proposition(String::from("A")),
+                Expression::Proposition(String::from("B"))
+            );
+            let vv = Binary::introduce_and(
+                operands.clone(),
+                &vec![make_node(operands.0.clone()), make_node(operands.1.clone())]
+            );
+            assert!(vv.is_ok());
+    
+            let vv = Binary::introduce_and(
+                operands.clone(),
+                &vec![make_node(operands.0.clone()), make_node(Expression::Empty)]
+            );
+            assert!(vv.is_err());
+    
+            let vv = Binary::introduce_and(
+                operands.clone(),
+                &vec![make_node(Expression::Empty), make_node(operands.1.clone())]
+            );
+            assert!(vv.is_err());
+    
+            let vv = Binary::introduce_and(
+                operands.clone(),
+                &vec![make_node(operands.1.clone()), make_node(operands.0.clone())]
+            );
+            assert!(vv.is_ok());
+        }
+    
+        #[test]
+        fn introduce_or() {
+            let operands = (
+                Expression::Proposition(String::from("A")),
+                Expression::Proposition(String::from("B"))
+            );
+            let vv = Binary::introduce_or(
+                operands.clone(),
+                &vec![make_node(operands.0.clone())]
+            );
+            assert!(vv.is_ok());
+    
+            let vv = Binary::introduce_or(
+                operands.clone(),
+                &vec![make_node(operands.1.clone())]
+            );
+            assert!(vv.is_ok());
+    
+            let vv = Binary::introduce_or(
+                operands.clone(),
+                &vec![make_node(Expression::Absurdum)]
+            );
+            assert!(vv.is_err());
+        }
+    
+        #[test]
+        fn introduce_condition() {
+            let operands = (
+                Expression::Proposition(String::from("A")),
+                Expression::Proposition(String::from("B"))
+            );
+    
+            let assump = make_node(operands.0.clone());
+            assump.borrow_mut().add_next(assump.clone(), operands.1.clone());
+    
+            let vv = Binary::introduce_condition(
+                operands.clone(),
+                &vec![assump]
+            );
+            assert!(vv.is_ok());
+    
+            let assump = make_node(operands.0.clone());
+            assump.borrow_mut().add_next(assump.clone(), Expression::Absurdum);
+    
+            let vv = Binary::introduce_condition(
+                operands.clone(),
+                &vec![assump]
+            );
+            assert!(vv.is_err());
+    
+            let assump = make_node(Expression::Empty);
+            assump.borrow_mut().add_next(assump.clone(), operands.1.clone());
+    
+            let vv = Binary::introduce_condition(
+                operands.clone(),
+                &vec![assump]
+            );
+            assert!(vv.is_err());
+        }
     }
 }
