@@ -209,7 +209,7 @@ impl Binary {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_binary {
     use std::{rc::Rc, cell::RefCell};
 
     use super::{Binary, Expression, Node};
@@ -220,8 +220,28 @@ mod tests {
             Expression::Proposition(String::from("A")),
             Expression::Proposition(String::from("B"))
         );
+        let vv = Binary::introduce_and(
+            operands.clone(),
+            &vec![Rc::new(RefCell::new(Node::new(operands.0.clone()))), Rc::new(RefCell::new(Node::new(operands.1.clone())))]
+        );
+        assert!(vv.is_ok());
 
-        let vv = Binary::introduce_and(operands.clone(), &vec![Rc::new(RefCell::new(Node::new(operands.0))), Rc::new(RefCell::new(Node::new(operands.1)))]);
+        let vv = Binary::introduce_and(
+            operands.clone(),
+            &vec![Rc::new(RefCell::new(Node::new(operands.0.clone()))), Rc::new(RefCell::new(Node::new(Expression::Empty)))]
+        );
+        assert!(vv.is_err());
+
+        let vv = Binary::introduce_and(
+            operands.clone(),
+            &vec![Rc::new(RefCell::new(Node::new(Expression::Empty))), Rc::new(RefCell::new(Node::new(operands.1.clone())))]
+        );
+        assert!(vv.is_err());
+
+        let vv = Binary::introduce_and(
+            operands.clone(),
+            &vec![Rc::new(RefCell::new(Node::new(operands.1.clone()))), Rc::new(RefCell::new(Node::new(operands.0.clone())))]
+        );
         assert!(vv.is_ok());
     }
 }
