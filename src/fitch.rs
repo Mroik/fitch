@@ -144,7 +144,7 @@ impl Node {
 
 impl Expression {
     fn is_available(available: &Vec<Expression>, exp: &Expression) -> bool {
-        return available.iter().any(|x| x == exp);
+        return available.contains(exp);
     }
 
     fn introduce(&self, available: Vec<Expression>, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
@@ -159,6 +159,7 @@ impl Expression {
                     Binary::And => Binary::introduce_and((left, right), assumptions),
                     Binary::Or => Binary::introduce_or((left, right), assumptions),
                     Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
+                    Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
                     _ => todo!(),
                 }
             },
@@ -173,7 +174,7 @@ impl Binary {
     }
 
     fn introduce_and(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
-        if assumptions.len() != 2 { return Err(()) };
+        if assumptions.len() != 2 { return Err(()); }
         let (left, right) = operands;
         let l = assumptions[0].as_ref().borrow();
         let r = assumptions[1].as_ref().borrow();
@@ -186,7 +187,7 @@ impl Binary {
     }
 
     fn introduce_or(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
-        if assumptions.len() != 1 { return Err(()) };
+        if assumptions.len() != 1 { return Err(()); };
         let (left, right) = operands;
         let value = assumptions[0].borrow();
         if left == *value.value() || right == *value.value() {
@@ -197,12 +198,28 @@ impl Binary {
 
     fn introduce_condition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
     -> Result<Rc<RefCell<Node>>, ()> {
-        if assumptions.len() != 1 {
-            return Err(());
-        }
+        if assumptions.len() != 1 { return Err(()) }
         let (left, right) = operands;
         if left == *assumptions[0].borrow().value() && right == assumptions[0].borrow().last_expression() {
             return Ok(Self::generate_node(Self::Conditional, left, right));
+        }
+        return Err(());
+    }
+
+    fn introduce_bicondition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
+    -> Result<Rc<RefCell<Node>>, ()> {
+        if assumptions.len() != 2 { return Err(()); }
+        let (left, right) = operands;
+        let a1 = assumptions[0].borrow().value().clone();
+        let a2 = assumptions[0].borrow().last_expression();
+        let b1 = assumptions[1].borrow().value().clone();
+        let b2 = assumptions[1].borrow().last_expression();
+        if !(a1 == b2 && a2 == b1) {return Err(()); }
+
+        let p1 = left == a1 && right == a2;
+        let p2 = left == b1 && right == b2;
+        if p1 || p2 {
+            return Ok(Self::generate_node(Self::Biconditional, left, right));
         }
         return Err(());
     }
@@ -346,6 +363,55 @@ mod tests {
             let vv = Binary::introduce_condition(
                 operands.clone(),
                 &vec![assump]
+            );
+            assert!(vv.is_err());
+        }
+
+        #[test]
+        fn introduce_bicondition() {
+            let operands = (
+                Expression::Proposition(String::from("A")),
+                Expression::Proposition(String::from("B"))
+            );
+            let assump1 = make_node(operands.0.clone());
+            assump1.borrow_mut().add_next(assump1.clone(), operands.1.clone());
+            let assump2 = make_node(operands.1.clone());
+            assump2.borrow_mut().add_next(assump2.clone(), operands.0.clone());
+
+            let vv = Binary::introduce_bicondition(
+                operands.clone(),
+                &vec![assump1, assump2]
+            );
+            assert!(vv.is_ok());
+
+            let assump1 = make_node(operands.0.clone());
+            assump1.borrow_mut().add_next(assump1.clone(), operands.1.clone());
+            let assump2 = make_node(operands.1.clone());
+            assump2.borrow_mut().add_next(assump2.clone(), Expression::Absurdum);
+
+            let vv = Binary::introduce_bicondition(
+                operands.clone(),
+                &vec![assump1, assump2]
+            );
+            assert!(vv.is_err());
+
+            let assump1 = make_node(operands.0.clone());
+            assump1.borrow_mut().add_next(assump1.clone(), Expression::Absurdum);
+            let assump2 = make_node(operands.1.clone());
+            assump2.borrow_mut().add_next(assump2.clone(), operands.0.clone());
+
+            let vv = Binary::introduce_bicondition(
+                operands.clone(),
+                &vec![assump1, assump2]
+            );
+            assert!(vv.is_err());
+
+            let assump1 = make_node(operands.0.clone());
+            assump1.borrow_mut().add_next(assump1.clone(), Expression::Absurdum);
+
+            let vv = Binary::introduce_bicondition(
+                operands.clone(),
+                &vec![assump1.clone(), assump1]
             );
             assert!(vv.is_err());
         }
