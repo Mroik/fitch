@@ -168,7 +168,7 @@ impl Expression {
                 }
                 return Unary::introduce_not(center, assumptions);
             }
-            _ => todo!(),
+            _ => Err(()),
         }
     }
 }
