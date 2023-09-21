@@ -72,7 +72,7 @@ impl Fitch {
         let available = self.lines.last().unwrap().borrow().available_sentences();
         match sentence.introduce(available, &assumptions) {
             Err(_) => false,
-            Ok(reference) => todo!(),
+            Ok(reference) => todo!(),  // TODO
         }
     }
 }
@@ -160,11 +160,26 @@ impl Expression {
                     Binary::Or => Binary::introduce_or((left, right), assumptions),
                     Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
                     Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
-                    _ => todo!(),
                 }
             },
+            Self::Unary(Unary::Not, center) => {
+                if !Self::is_available(&available, center) {
+                    return Err(());
+                }
+                return Unary::introduce_not(center, assumptions);
+            }
             _ => todo!(),
         }
+    }
+}
+
+impl Unary {
+    fn introduce_not(center: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        if assumptions.len() != 1 { return Err(()); }
+        let res = Expression::Unary(Unary::Not, Box::new(assumptions[0].borrow().value().clone()));
+        if *center != res { return Err(()) };
+        if assumptions[0].borrow().last_expression() != Expression::Absurdum { return Err(()); }
+        return Ok(Rc::new(RefCell::new(Node::new(res))));
     }
 }
 
@@ -226,6 +241,14 @@ impl Binary {
 }
 
 mod tests {
+    use std::{rc::Rc, cell::RefCell};
+
+    use super::{Expression, Node};
+
+    fn make_node(exp: Expression) -> Rc<RefCell<Node>> {
+        return Rc::new(RefCell::new(Node::new(exp)));
+    }
+
     #[cfg(test)]
     mod test_node {
         use std::{rc::Rc, cell::RefCell, vec};
@@ -270,11 +293,7 @@ mod tests {
     mod test_binary {
         use std::{rc::Rc, cell::RefCell};
 
-        use crate::fitch::{Expression, Node, Binary};
-    
-        fn make_node(exp: Expression) -> Rc<RefCell<Node>> {
-            return Rc::new(RefCell::new(Node::new(exp)));
-        }
+        use crate::fitch::{Expression, Node, Binary, tests::make_node};
     
         #[test]
         fn introduce_and() {
@@ -412,6 +431,44 @@ mod tests {
             let vv = Binary::introduce_bicondition(
                 operands.clone(),
                 &vec![assump1.clone(), assump1]
+            );
+            assert!(vv.is_err());
+        }
+    }
+
+    #[cfg(test)]
+    mod test_unary {
+        use crate::fitch::{Expression, Unary};
+
+        use super::make_node;
+
+        #[test]
+        fn introduce_not() {
+            let assump = Expression::Proposition(String::from("A"));
+            let operand = make_node(assump.clone());
+            operand.borrow_mut().add_next(operand.clone(), Expression::Absurdum);
+
+            let vv = Unary::introduce_not(
+                &Expression::Unary(Unary::Not, Box::new(assump.clone())),
+                &vec![operand.clone()]
+            );
+            assert!(vv.is_ok());
+
+            let operand = make_node(assump.clone());
+            operand.borrow_mut().add_next(operand.clone(), Expression::Proposition(String::from("B")));
+
+            let vv = Unary::introduce_not(
+                &Expression::Unary(Unary::Not, Box::new(assump.clone())),
+                &vec![operand.clone()]
+            );
+            assert!(vv.is_err());
+
+            let operand = make_node(assump.clone());
+            operand.borrow_mut().add_next(operand.clone(), Expression::Absurdum);
+
+            let vv = Unary::introduce_not(
+                &Expression::Unary(Unary::Not, Box::new(Expression::Proposition(String::from("B")))),
+                &vec![operand.clone()]
             );
             assert!(vv.is_err());
         }
