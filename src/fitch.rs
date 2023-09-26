@@ -68,9 +68,9 @@ impl Fitch {
         self.lines.push(res);
     }
 
+    // TODO check for availability
     fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
-        let available = self.lines.last().unwrap().borrow().available_sentences();
-        match sentence.introduce(available, &assumptions) {
+        match sentence.introduce(&assumptions) {
             Err(_) => false,
             Ok(reference) => todo!(),  // TODO
         }
@@ -147,12 +147,9 @@ impl Expression {
         return available.contains(exp);
     }
 
-    fn introduce(&self, available: Vec<Expression>, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce(&self, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         match self {
             Self::Binary(oper, left, right) => {
-                if !(Self::is_available(&available, left) && Self::is_available(&available, right)) {
-                    return Err(());
-                }
                 let left = left.as_ref().clone();
                 let right = right.as_ref().clone();
                 match oper {
@@ -162,12 +159,7 @@ impl Expression {
                     Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
                 }
             },
-            Self::Unary(Unary::Not, center) => {
-                if !Self::is_available(&available, center) {
-                    return Err(());
-                }
-                return Unary::introduce_not(center, assumptions);
-            }
+            Self::Unary(Unary::Not, center) => Unary::introduce_not(center, assumptions),
             _ => Err(()),
         }
     }
