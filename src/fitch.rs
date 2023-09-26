@@ -160,7 +160,17 @@ impl Expression {
                 }
             },
             Self::Unary(Unary::Not, center) => Unary::introduce_not(center, assumptions),
-            _ => Err(()),
+            Self::Absurdum => {
+                let a1 = assumptions[0].borrow().value().clone();
+                let a2 = assumptions[1].borrow().value().clone();
+                let p1 = Expression::Unary(Unary::Not, Box::new(a1.clone()));
+                let p2 = Expression::Unary(Unary::Not, Box::new(a2.clone()));
+                if a1 == p2 || a2 == p1 {
+                    return Ok(Rc::new(RefCell::new(Node::new(self.clone()))));
+                }
+                return Err(());
+            },
+            exp => Ok(Rc::new(RefCell::new(Node::new(exp.clone())))),
         }
     }
 }
