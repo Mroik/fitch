@@ -70,9 +70,36 @@ impl Fitch {
 
     // TODO check for availability
     fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
-        match sentence.introduce(&assumptions) {
+        match Self::internal_introduce(sentence, &assumptions) {
             Err(_) => false,
             Ok(reference) => todo!(),  // TODO
+        }
+    }
+
+    fn internal_introduce(exp: Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        match exp {
+            Expression::Binary(oper, left, right) => {
+                let left = left.as_ref().clone();
+                let right = right.as_ref().clone();
+                match oper {
+                    Binary::And => Binary::introduce_and((left, right), assumptions),
+                    Binary::Or => Binary::introduce_or((left, right), assumptions),
+                    Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
+                    Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
+                }
+            },
+            Expression::Unary(Unary::Not, center) => Unary::introduce_not(center.as_ref(), assumptions),
+            Expression::Absurdum => {
+                let a1 = assumptions[0].borrow().value().clone();
+                let a2 = assumptions[1].borrow().value().clone();
+                let p1 = Expression::Unary(Unary::Not, Box::new(a1.clone()));
+                let p2 = Expression::Unary(Unary::Not, Box::new(a2.clone()));
+                if a1 == p2 || a2 == p1 {
+                    return Ok(Rc::new(RefCell::new(Node::new(exp.clone()))));
+                }
+                return Err(());
+            },
+            _ => Err(()),
         }
     }
 }
@@ -139,39 +166,6 @@ impl Node {
 
     fn available_sentences(&self) -> Vec<Expression> {
         return self.internal_available_sentences(None);
-    }
-}
-
-impl Expression {
-    fn is_available(available: &Vec<Expression>, exp: &Expression) -> bool {
-        return available.contains(exp);
-    }
-
-    fn introduce(&self, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
-        match self {
-            Self::Binary(oper, left, right) => {
-                let left = left.as_ref().clone();
-                let right = right.as_ref().clone();
-                match oper {
-                    Binary::And => Binary::introduce_and((left, right), assumptions),
-                    Binary::Or => Binary::introduce_or((left, right), assumptions),
-                    Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
-                    Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
-                }
-            },
-            Self::Unary(Unary::Not, center) => Unary::introduce_not(center, assumptions),
-            Self::Absurdum => {
-                let a1 = assumptions[0].borrow().value().clone();
-                let a2 = assumptions[1].borrow().value().clone();
-                let p1 = Expression::Unary(Unary::Not, Box::new(a1.clone()));
-                let p2 = Expression::Unary(Unary::Not, Box::new(a2.clone()));
-                if a1 == p2 || a2 == p1 {
-                    return Ok(Rc::new(RefCell::new(Node::new(self.clone()))));
-                }
-                return Err(());
-            },
-            exp => Ok(Rc::new(RefCell::new(Node::new(exp.clone())))),
-        }
     }
 }
 
