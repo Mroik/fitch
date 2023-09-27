@@ -89,6 +89,7 @@ impl Fitch {
                 }
             },
             Expression::Unary(Unary::Not, center) => Unary::introduce_not(center.as_ref(), assumptions),
+            // TODO write test for absurdum introduction
             Expression::Absurdum => {
                 let a1 = assumptions[0].borrow().value().clone();
                 let a2 = assumptions[1].borrow().value().clone();
@@ -100,6 +101,20 @@ impl Fitch {
                 return Err(());
             },
             _ => Err(()),
+        }
+    }
+
+    fn internal_eliminate(exp: Expression, operation: Expression, assumptions: &Vec<Rc<RefCell<Node>>>)
+    -> Result<Rc<RefCell<Node>>, ()> {
+        match exp {
+            // TODO write test for absurdum elimination
+            Expression::Absurdum => {
+                if !(*assumptions[0].borrow().value() == Expression::Absurdum) {
+                    return Err(());
+                }
+                return Ok(Rc::new(RefCell::new(Node::new(exp))));
+            },
+            _ => todo!(),
         }
     }
 }
