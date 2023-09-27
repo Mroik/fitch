@@ -114,6 +114,7 @@ impl Fitch {
                 }
                 return Ok(Rc::new(RefCell::new(Node::new(exp))));
             },
+            Expression::Unary(Unary::Not, center) => Unary::eliminate_not(center.as_ref(), assumptions),
             _ => todo!(),
         }
     }
@@ -191,6 +192,23 @@ impl Unary {
         if *center != res { return Err(()) };
         if assumptions[0].borrow().last_expression() != Expression::Absurdum { return Err(()); }
         return Ok(Rc::new(RefCell::new(Node::new(res))));
+    }
+
+    fn eliminate_not(center: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        match assumptions[0].borrow().value() {
+            Expression::Unary(Unary::Not, inner) => {
+                match inner.as_ref() {
+                    Expression::Unary(Unary::Not, exp) => {
+                        if *exp.as_ref() == *center {
+                            return Ok(Rc::new(RefCell::new(Node::new(center.clone()))));
+                        }
+                        return Err(());
+                    },
+                    _ => Err(()),
+                }
+            },
+            _ => Err(()),
+        }
     }
 }
 
@@ -480,6 +498,37 @@ mod tests {
             let vv = Unary::introduce_not(
                 &Expression::Unary(Unary::Not, Box::new(Expression::Proposition(String::from("B")))),
                 &vec![operand.clone()]
+            );
+            assert!(vv.is_err());
+        }
+
+        #[test]
+        fn eliminate_not() {
+            let assump = Expression::Proposition(String::from("A"));
+            let vv = Unary::eliminate_not(
+                &assump,
+                &vec![make_node(Expression::Unary(
+                    Unary::Not,
+                    Box::new(Expression::Unary(Unary::Not, Box::new(assump.clone())))
+                ))]
+            );
+            assert!(vv.is_ok());
+
+            let vv = Unary::eliminate_not(
+                &assump,
+                &vec![make_node(Expression::Unary(
+                    Unary::Not,
+                    Box::new(assump.clone())
+                ))]
+            );
+            assert!(vv.is_err());
+
+            let vv = Unary::eliminate_not(
+                &assump,
+                &vec![make_node(Expression::Unary(
+                    Unary::Not,
+                    Box::new(Expression::Unary(Unary::Not, Box::new(Expression::Absurdum)))
+                ))]
             );
             assert!(vv.is_err());
         }
