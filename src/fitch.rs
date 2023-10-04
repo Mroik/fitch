@@ -267,6 +267,21 @@ impl Binary {
         }
         return Err(());
     }
+
+    fn eliminate_and(exp: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+        if assumptions.len() != 1 {
+            return Err(());
+        }
+        match assumptions[0].borrow().value() {
+            Expression::Binary(Binary::And, left, right) => {
+                if left.as_ref() == exp || right.as_ref() == exp {
+                    return Ok(Rc::new(RefCell::new(Node::new(exp.clone()))));
+                }
+                return Err(());
+            },
+            _ => return Err(()),
+        }
+    }
 }
 
 mod tests {
@@ -460,6 +475,28 @@ mod tests {
             let vv = Binary::introduce_bicondition(
                 operands.clone(),
                 &vec![assump1.clone(), assump1]
+            );
+            assert!(vv.is_err());
+        }
+
+        #[test]
+        fn eliminate_and() {
+            let intt = Expression::Proposition(String::from("A"));
+            let vv = Binary::eliminate_and(
+                &intt,
+                &vec![make_node(Expression::Binary(Binary::And, Box::new(intt.clone()), Box::new(Expression::Absurdum)))]
+            );
+            assert!(vv.is_ok());
+
+            let vv = Binary::eliminate_and(
+                &intt,
+                &vec![make_node(Expression::Binary(Binary::And, Box::new(Expression::Absurdum), Box::new(intt.clone())))]
+            );
+            assert!(vv.is_ok());
+
+            let vv = Binary::eliminate_and(
+                &intt,
+                &vec![make_node(Expression::Binary(Binary::And, Box::new(Expression::Absurdum), Box::new(Expression::Absurdum)))]
             );
             assert!(vv.is_err());
         }
