@@ -35,6 +35,19 @@ enum Binary {
     Biconditional,
 }
 
+enum Operation {
+    IntroAnd,
+    IntroOr,
+    IntroNot,
+    IntroConditional,
+    IntorBiconditional,
+    ElimAnd,
+    ElimOr,
+    ElimNot,
+    ElimConditional,
+    ElimBiconditional,
+}
+
 impl Fitch {
     fn new(mut premises: Vec<Expression>) -> Self {
         let root = Rc::new(RefCell::new(Node {
@@ -66,6 +79,12 @@ impl Fitch {
         let last = last.unwrap();
         let res = last.borrow_mut().add_child(last.clone(), assumption);
         self.lines.push(res);
+    }
+
+    fn from_operation(operation: Operation, assumption: &Vec<Rc<RefCell<Node>>>) -> bool {
+        match operation {
+            _ => todo!()
+        }
     }
 
     // TODO check for availability
