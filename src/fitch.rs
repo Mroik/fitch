@@ -84,10 +84,11 @@ impl Fitch {
     }
 
     // TODO check for availability
-    fn from_operation(&mut self, sentence: Expression, operation: Operation, assumption: &Vec<Rc<RefCell<Node>>>) -> bool {
+    fn from_operation(&mut self, sentence: Expression, operation: Operation, assumptions: &Vec<Rc<RefCell<Node>>>) -> bool {
         let new_sentence = match operation {
-            Operation::IntroAnd => Binary::introduce_and(assumption),
-            Operation::IntroOr => Binary::introduce_or(sentence, assumption),
+            Operation::IntroAnd => Binary::introduce_and(assumptions),
+            Operation::IntroOr => Binary::introduce_or(sentence, assumptions),
+            Operation::IntroConditional => Binary::introduce_condition(assumptions),
             _ => todo!()
         };
 
@@ -109,7 +110,7 @@ impl Fitch {
                 match oper {
                     //Binary::And => Binary::introduce_and(assumptions),
                     //Binary::Or => Binary::introduce_or((left, right), assumptions),
-                    Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
+                    //Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
                     Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
                     _ => unreachable!()
                 }
@@ -264,14 +265,12 @@ impl Binary {
         }
     }
 
-    fn introduce_condition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
-    -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce_condition(assumptions: &Vec<Rc<RefCell<Node>>>)
+    -> Result<Expression, ()> {
         if assumptions.len() != 1 { return Err(()) }
-        let (left, right) = operands;
-        if left == *assumptions[0].borrow().value() && right == assumptions[0].borrow().last_expression() {
-            return Ok(Self::generate_node(Self::Conditional, left, right));
-        }
-        return Err(());
+        let cond = assumptions[0].borrow().value().clone();
+        let res = assumptions[0].borrow().last_expression().clone();
+        return Ok(Expression::Binary(Binary::Conditional, Box::new(cond), Box::new(res)));
     }
 
     fn introduce_bicondition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
@@ -422,26 +421,12 @@ mod tests {
             assump.borrow_mut().add_next(assump.clone(), operands.1.clone());
     
             let vv = Binary::introduce_condition(
-                operands.clone(),
-                &vec![assump]
+                &vec![assump.clone()]
             );
             assert!(vv.is_ok());
-    
-            let assump = make_node(operands.0.clone());
-            assump.borrow_mut().add_next(assump.clone(), Expression::Absurdum);
-    
+
             let vv = Binary::introduce_condition(
-                operands.clone(),
-                &vec![assump]
-            );
-            assert!(vv.is_err());
-    
-            let assump = make_node(Expression::Empty);
-            assump.borrow_mut().add_next(assump.clone(), operands.1.clone());
-    
-            let vv = Binary::introduce_condition(
-                operands.clone(),
-                &vec![assump]
+                &vec![assump, make_node(Expression::Absurdum)]
             );
             assert!(vv.is_err());
         }
