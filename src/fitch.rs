@@ -41,11 +41,13 @@ enum Operation {
     IntroNot,
     IntroConditional,
     IntorBiconditional,
+    IntroAbsurdum,
     ElimAnd,
     ElimOr,
     ElimNot,
     ElimConditional,
     ElimBiconditional,
+    ElimAbsurdum,
 }
 
 impl Fitch {
@@ -82,9 +84,10 @@ impl Fitch {
     }
 
     // TODO check for availability
-    fn from_operation(&mut self, operation: Operation, assumption: &Vec<Rc<RefCell<Node>>>) -> bool {
+    fn from_operation(&mut self, sentence: Expression, operation: Operation, assumption: &Vec<Rc<RefCell<Node>>>) -> bool {
         let new_sentence = match operation {
             Operation::IntroAnd => Binary::introduce_and(assumption),
+            Operation::IntroOr => Binary::introduce_or(sentence, assumption),
             _ => todo!()
         };
 
@@ -105,7 +108,7 @@ impl Fitch {
                 let right = right.as_ref().clone();
                 match oper {
                     //Binary::And => Binary::introduce_and(assumptions),
-                    Binary::Or => Binary::introduce_or((left, right), assumptions),
+                    //Binary::Or => Binary::introduce_or((left, right), assumptions),
                     Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
                     Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
                     _ => unreachable!()
@@ -248,14 +251,17 @@ impl Binary {
         return Ok(Expression::Binary(Binary::And, Box::new(left.value().clone()), Box::new(right.value().clone())));
     }
 
-    fn introduce_or(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce_or(sentence: Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Expression, ()> {
         if assumptions.len() != 1 { return Err(()); };
-        let (left, right) = operands;
-        let value = assumptions[0].borrow();
-        if left == *value.value() || right == *value.value() {
-            return Ok(Self::generate_node(Self::Or, left, right));
+        match sentence.clone() {
+            Expression::Binary(Binary::Or, left, right) => {
+                if *left == *assumptions[0].borrow().value() || *right == *assumptions[0].borrow().value() {
+                    return Ok(sentence);
+                }
+                return Err(());
+            },
+            _ => Err(())
         }
-        return Err(());
     }
 
     fn introduce_condition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
@@ -381,24 +387,25 @@ mod tests {
     
         #[test]
         fn introduce_or() {
-            let operands = (
-                Expression::Proposition(String::from("A")),
-                Expression::Proposition(String::from("B"))
+            let operand = Expression::Binary(
+                Binary::Or,
+                Box::new(Expression::Proposition(String::from("A"))),
+                Box::new(Expression::Proposition(String::from("B")))
             );
             let vv = Binary::introduce_or(
-                operands.clone(),
-                &vec![make_node(operands.0.clone())]
-            );
-            assert!(vv.is_ok());
-    
-            let vv = Binary::introduce_or(
-                operands.clone(),
-                &vec![make_node(operands.1.clone())]
+                operand.clone(),
+                &vec![make_node(Expression::Proposition(String::from("A")))]
             );
             assert!(vv.is_ok());
     
             let vv = Binary::introduce_or(
-                operands.clone(),
+                operand.clone(),
+                &vec![make_node(Expression::Proposition(String::from("B")))]
+            );
+            assert!(vv.is_ok());
+    
+            let vv = Binary::introduce_or(
+                operand.clone(),
                 &vec![make_node(Expression::Absurdum)]
             );
             assert!(vv.is_err());
