@@ -81,30 +81,34 @@ impl Fitch {
         self.lines.push(res);
     }
 
-    fn from_operation(operation: Operation, assumption: &Vec<Rc<RefCell<Node>>>) -> bool {
-        match operation {
-            _ => todo!()
-        }
-    }
-
     // TODO check for availability
-    fn introduce(&mut self, sentence: Expression, assumptions: Vec<Rc<RefCell<Node>>>) -> bool {
-        match Self::internal_introduce(sentence, &assumptions) {
-            Err(_) => false,
-            Ok(reference) => todo!(),  // TODO
+    fn from_operation(&mut self, operation: Operation, assumption: &Vec<Rc<RefCell<Node>>>) -> bool {
+        let new_sentence = match operation {
+            Operation::IntroAnd => Binary::introduce_and(assumption),
+            _ => todo!()
+        };
+
+        if !new_sentence.is_ok() {
+            return false;
         }
+
+        let new_last = self.root.borrow_mut().add_next(self.lines.last().unwrap().clone(), new_sentence.unwrap());
+        self.lines.push(new_last);
+        return true;
     }
 
+    // TODO remove this function
     fn internal_introduce(exp: Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         match exp {
             Expression::Binary(oper, left, right) => {
                 let left = left.as_ref().clone();
                 let right = right.as_ref().clone();
                 match oper {
-                    Binary::And => Binary::introduce_and((left, right), assumptions),
+                    //Binary::And => Binary::introduce_and(assumptions),
                     Binary::Or => Binary::introduce_or((left, right), assumptions),
                     Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
                     Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
+                    _ => unreachable!()
                 }
             },
             Expression::Unary(Unary::Not, center) => Unary::introduce_not(center.as_ref(), assumptions),
@@ -123,6 +127,7 @@ impl Fitch {
         }
     }
 
+    // TODO remove this function
     fn internal_eliminate(exp: Expression, operation: Expression, assumptions: &Vec<Rc<RefCell<Node>>>)
     -> Result<Rc<RefCell<Node>>, ()> {
         match exp {
@@ -236,17 +241,11 @@ impl Binary {
         return Rc::new(RefCell::new(Node::new(Expression::Binary(operator, Box::new(left), Box::new(right)))));
     }
 
-    fn introduce_and(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce_and(assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Expression, ()> {
         if assumptions.len() != 2 { return Err(()); }
-        let (left, right) = operands;
-        let l = assumptions[0].as_ref().borrow();
-        let r = assumptions[1].as_ref().borrow();
-        let a = left == *l.value() && right == *r.value();
-        let b = right == *l.value() && left == *r.value();
-        if a || b {
-            return Ok(Self::generate_node(Self::And, left, right));
-        }
-        return Err(());
+        let left = assumptions[0].as_ref().borrow();
+        let right = assumptions[1].as_ref().borrow();
+        return Ok(Expression::Binary(Binary::And, Box::new(left.value().clone()), Box::new(right.value().clone())));
     }
 
     fn introduce_or(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
@@ -365,25 +364,16 @@ mod tests {
                 Expression::Proposition(String::from("B"))
             );
             let vv = Binary::introduce_and(
-                operands.clone(),
                 &vec![make_node(operands.0.clone()), make_node(operands.1.clone())]
             );
             assert!(vv.is_ok());
     
             let vv = Binary::introduce_and(
-                operands.clone(),
-                &vec![make_node(operands.0.clone()), make_node(Expression::Empty)]
+                &vec![make_node(operands.0.clone()), make_node(Expression::Empty), make_node(Expression::Empty)]
             );
             assert!(vv.is_err());
     
             let vv = Binary::introduce_and(
-                operands.clone(),
-                &vec![make_node(Expression::Empty), make_node(operands.1.clone())]
-            );
-            assert!(vv.is_err());
-    
-            let vv = Binary::introduce_and(
-                operands.clone(),
                 &vec![make_node(operands.1.clone()), make_node(operands.0.clone())]
             );
             assert!(vv.is_ok());
