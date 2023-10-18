@@ -90,6 +90,7 @@ impl Fitch {
             Operation::IntroOr => Binary::introduce_or(sentence, assumptions),
             Operation::IntroConditional => Binary::introduce_condition(assumptions),
             Operation::IntorBiconditional => Binary::introduce_bicondition(assumptions),
+            Operation::IntroAbsurdum => Expression::introduce_absurbdum(assumptions),
             _ => todo!()
         };
 
@@ -214,6 +215,20 @@ impl Node {
     }
 }
 
+impl Expression {
+    fn introduce_absurbdum(assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Expression, ()> {
+        if assumptions.len() != 2 { return Err(()) };
+        let left = assumptions[0].borrow();
+        let right = assumptions[1].borrow();
+        if Expression::Unary(Unary::Not, Box::new(left.value().clone())) == *right.value() {
+            return Ok(Expression::Absurdum);
+        } else if Expression::Unary(Unary::Not, Box::new(right.value().clone())) == *left.value() {
+            return Ok(Expression::Absurdum);
+        }
+        return Err(());
+    }
+}
+
 impl Unary {
     fn introduce_not(center: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
         if assumptions.len() != 1 { return Err(()); }
@@ -308,6 +323,46 @@ mod tests {
 
     fn make_node(exp: Expression) -> Rc<RefCell<Node>> {
         return Rc::new(RefCell::new(Node::new(exp)));
+    }
+
+    #[cfg(test)]
+    mod test_expression {
+        use crate::fitch::{Expression, Unary};
+
+        use super::make_node;
+
+        #[test]
+        fn introduce_absurbdum() {
+            let p1 = Expression::Proposition(String::from("A"));
+            let p2 = Expression::Unary(
+                Unary::Not,
+                Box::new(Expression::Proposition(String::from("A")))
+            );
+
+            let vv = Expression::introduce_absurbdum(
+                &vec![make_node(p1), make_node(p2)]
+            );
+            assert!(vv.is_ok());
+
+            let p2 = Expression::Proposition(String::from("A"));
+            let p1 = Expression::Unary(
+                Unary::Not,
+                Box::new(Expression::Proposition(String::from("A")))
+            );
+
+            let vv = Expression::introduce_absurbdum(
+                &vec![make_node(p1), make_node(p2)]
+            );
+            assert!(vv.is_ok());
+
+            let p1 = Expression::Proposition(String::from("A"));
+            let p2 = Expression::Proposition(String::from("B"));
+
+            let vv = Expression::introduce_absurbdum(
+                &vec![make_node(p1), make_node(p2)]
+            );
+            assert!(vv.is_err());
+        }
     }
 
     #[cfg(test)]
