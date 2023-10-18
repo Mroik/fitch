@@ -89,6 +89,7 @@ impl Fitch {
             Operation::IntroAnd => Binary::introduce_and(assumptions),
             Operation::IntroOr => Binary::introduce_or(sentence, assumptions),
             Operation::IntroConditional => Binary::introduce_condition(assumptions),
+            Operation::IntorBiconditional => Binary::introduce_bicondition(assumptions),
             _ => todo!()
         };
 
@@ -111,7 +112,7 @@ impl Fitch {
                     //Binary::And => Binary::introduce_and(assumptions),
                     //Binary::Or => Binary::introduce_or((left, right), assumptions),
                     //Binary::Conditional => Binary::introduce_condition((left, right), assumptions),
-                    Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
+                    //Binary::Biconditional => Binary::introduce_bicondition((left, right), assumptions),
                     _ => unreachable!()
                 }
             },
@@ -273,22 +274,15 @@ impl Binary {
         return Ok(Expression::Binary(Binary::Conditional, Box::new(cond), Box::new(res)));
     }
 
-    fn introduce_bicondition(operands: (Expression, Expression), assumptions: &Vec<Rc<RefCell<Node>>>)
-    -> Result<Rc<RefCell<Node>>, ()> {
+    fn introduce_bicondition(assumptions: &Vec<Rc<RefCell<Node>>>)
+    -> Result<Expression, ()> {
         if assumptions.len() != 2 { return Err(()); }
-        let (left, right) = operands;
         let a1 = assumptions[0].borrow().value().clone();
         let a2 = assumptions[0].borrow().last_expression();
         let b1 = assumptions[1].borrow().value().clone();
         let b2 = assumptions[1].borrow().last_expression();
-        if !(a1 == b2 && a2 == b1) {return Err(()); }
-
-        let p1 = left == a1 && right == a2;
-        let p2 = left == b1 && right == b2;
-        if p1 || p2 {
-            return Ok(Self::generate_node(Self::Biconditional, left, right));
-        }
-        return Err(());
+        if !(a1 == b2 && a2 == b1) { return Err(()); }
+        return Ok(Expression::Binary(Binary::Biconditional, Box::new(a1), Box::new(a2)));
     }
 
     fn eliminate_and(exp: &Expression, assumptions: &Vec<Rc<RefCell<Node>>>) -> Result<Rc<RefCell<Node>>, ()> {
@@ -443,7 +437,6 @@ mod tests {
             assump2.borrow_mut().add_next(assump2.clone(), operands.0.clone());
 
             let vv = Binary::introduce_bicondition(
-                operands.clone(),
                 &vec![assump1, assump2]
             );
             assert!(vv.is_ok());
@@ -454,7 +447,6 @@ mod tests {
             assump2.borrow_mut().add_next(assump2.clone(), Expression::Absurdum);
 
             let vv = Binary::introduce_bicondition(
-                operands.clone(),
                 &vec![assump1, assump2]
             );
             assert!(vv.is_err());
@@ -465,7 +457,6 @@ mod tests {
             assump2.borrow_mut().add_next(assump2.clone(), operands.0.clone());
 
             let vv = Binary::introduce_bicondition(
-                operands.clone(),
                 &vec![assump1, assump2]
             );
             assert!(vv.is_err());
@@ -474,7 +465,6 @@ mod tests {
             assump1.borrow_mut().add_next(assump1.clone(), Expression::Absurdum);
 
             let vv = Binary::introduce_bicondition(
-                operands.clone(),
                 &vec![assump1.clone(), assump1]
             );
             assert!(vv.is_err());
