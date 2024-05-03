@@ -54,11 +54,25 @@ impl Proposition {
     }
 }
 
+enum FitchComponent {
+    Assumption(Rc<Proposition>),
+    Deduction(Rc<Proposition>),
+}
+
+impl FitchComponent {
+    fn unwrap(&self) -> Rc<Proposition> {
+        match self {
+            FitchComponent::Assumption(t) => t.clone(),
+            FitchComponent::Deduction(t) => t.clone(),
+        }
+    }
+}
+
 type Level = u32;
 
 struct Fitch {
-    statements: Vec<(Level, Proposition)>,
-    start_of_deductions: u32,
+    statements: Vec<(Level, FitchComponent)>,
+    start_of_deductions: usize,
 }
 
 impl Display for Fitch {
@@ -68,15 +82,39 @@ impl Display for Fitch {
             .iter()
             .enumerate()
             .for_each(|(i, (level, expression))| {
-                if i as u32 == self.start_of_deductions {
+                if i == self.start_of_deductions {
                     res.push_str("------------------\n");
                 }
                 for _ in 0..*level {
                     res.push_str("    ");
                 }
-                res.push_str(expression.to_string().as_str());
+                res.push_str(expression.unwrap().to_string().as_str());
                 res.push_str("\n");
             });
         write!(f, "{}", res)
+    }
+}
+
+impl Fitch {
+    fn new() -> Fitch {
+        Fitch {
+            statements: Vec::new(),
+            start_of_deductions: 0,
+        }
+    }
+
+    fn add_assumption(&mut self, prop: &Rc<Proposition>) {
+        self.statements.insert(
+            self.start_of_deductions,
+            (0, FitchComponent::Assumption(prop.clone())),
+        );
+        self.start_of_deductions += 1;
+    }
+
+    fn delete_last_row(&mut self) {
+        self.statements.pop();
+        if self.statements.len() < self.start_of_deductions {
+            self.start_of_deductions = self.statements.len();
+        }
     }
 }
