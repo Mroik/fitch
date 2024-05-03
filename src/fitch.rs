@@ -53,3 +53,30 @@ impl Proposition {
         Rc::new(Proposition::Iff(left.clone(), right.clone()))
     }
 }
+
+type Level = u32;
+
+struct Fitch {
+    statements: Vec<(Level, Proposition)>,
+    start_of_deductions: u32,
+}
+
+impl Display for Fitch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut res = String::new();
+        self.statements
+            .iter()
+            .enumerate()
+            .for_each(|(i, (level, expression))| {
+                if i as u32 == self.start_of_deductions {
+                    res.push_str("------------------\n");
+                }
+                for _ in 0..*level {
+                    res.push_str("    ");
+                }
+                res.push_str(expression.to_string().as_str());
+                res.push_str("\n");
+            });
+        write!(f, "{}", res)
+    }
+}
