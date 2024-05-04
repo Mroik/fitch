@@ -190,6 +190,7 @@ impl Fitch {
         }
     }
 
+    // This prolly has some bugs
     fn find_sub_assum(&self, row: usize) -> Option<usize> {
         let level = match self.statements.get(row) {
             None => return None,
@@ -226,6 +227,7 @@ impl Fitch {
         true
     }
 
+    // This prolly has some bugs
     fn get_subproof_result(&self, n: usize) -> Option<&Rc<Proposition>> {
         let start = match self.statements.get(n) {
             Some((level, FitchComponent::Assumption(_))) => level,
