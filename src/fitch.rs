@@ -127,10 +127,19 @@ impl Fitch {
         self.start_of_deductions += 1;
     }
 
+    fn add_subproof(&mut self, prop: &Rc<Proposition>) {
+        self.current_level += 1;
+        self.add_assumption(prop);
+    }
+
     fn delete_last_row(&mut self) {
         self.statements.pop();
         if self.statements.len() < self.start_of_deductions {
             self.start_of_deductions = self.statements.len();
+        }
+        match self.statements.last() {
+            None => (),
+            Some((l, _)) => self.current_level = *l,
         }
     }
 
