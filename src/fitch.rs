@@ -289,6 +289,26 @@ impl Fitch {
         ));
         true
     }
+
+    fn introduce_absurdum(&mut self, ass1: usize, ass2: usize) -> bool {
+        let a1 = match self.statements.get(ass1) {
+            None => return false,
+            Some(v) => v.1.unwrap(),
+        };
+        let a2 = match self.statements.get(ass2) {
+            None => return false,
+            Some(v) => v.1.unwrap(),
+        };
+
+        let n1 = Proposition::new_not(a1);
+        let n2 = Proposition::new_not(a2);
+        if !(&n1 == a2 || &n2 == a1) {
+            return false;
+        }
+
+        self.statements.push((self.current_level, FitchComponent::Deduction(Proposition::new_absurdum())));
+        true
+    }
 }
 
 #[cfg(test)]
@@ -355,5 +375,17 @@ mod tests {
         let ris = fitch.eliminate_or(1, 2, 4);
         assert!(ris);
         assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t0);
+    }
+
+    #[test]
+    fn introduce_absurdum() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_not(&t0);
+        fitch.add_assumption(&t0);
+        fitch.add_assumption(&t1);
+        let ris = fitch.introduce_absurdum(0, 1);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &Proposition::new_absurdum());
     }
 }
