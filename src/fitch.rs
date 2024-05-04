@@ -306,7 +306,43 @@ impl Fitch {
             return false;
         }
 
-        self.statements.push((self.current_level, FitchComponent::Deduction(Proposition::new_absurdum())));
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(Proposition::new_absurdum()),
+        ));
+        true
+    }
+
+    fn introduce_not(&mut self, sub_proof: usize) -> bool {
+        let sub_res = match self.get_subproof_result(sub_proof) {
+            None => return false,
+            Some(v) => v,
+        };
+
+        let cur = self.statements.get(sub_proof).unwrap().1.unwrap();
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(Proposition::new_not(cur)),
+        ));
+        true
+    }
+
+    fn eliminate_not(&mut self, row: usize) -> bool {
+        let cur = match self.statements.get(row) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+
+        let cur = match cur.borrow() {
+            Proposition::Not(v) => match v.borrow() {
+                Proposition::Not(b) => b,
+                _ => return false,
+            },
+            _ => return false,
+        };
+
+        self.statements
+            .push((self.current_level, FitchComponent::Deduction(cur.clone())));
         true
     }
 }
@@ -386,6 +422,37 @@ mod tests {
         fitch.add_assumption(&t1);
         let ris = fitch.introduce_absurdum(0, 1);
         assert!(ris);
-        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &Proposition::new_absurdum());
+        assert_eq!(
+            fitch.statements.last().unwrap().1.unwrap(),
+            &Proposition::new_absurdum()
+        );
+    }
+
+    #[test]
+    fn introduce_not() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_absurdum();
+        let t1 = Proposition::new_term("A");
+        fitch.add_assumption(&t0);
+        fitch.add_subproof(&t1);
+        fitch.reiterate(0);
+        fitch.end_subproof();
+        let ris = fitch.introduce_not(1);
+        assert!(ris);
+        assert_eq!(
+            fitch.statements.last().unwrap().1.unwrap(),
+            &Proposition::new_not(&t1)
+        );
+    }
+
+    #[test]
+    fn eliminate_not() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_not(&Proposition::new_not(&t0));
+        fitch.add_assumption(&t1);
+        let ris = fitch.eliminate_not(0);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t0);
     }
 }
