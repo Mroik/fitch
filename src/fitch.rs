@@ -1,5 +1,6 @@
 use std::{borrow::Borrow, fmt::Display, rc::Rc};
 
+#[derive(Debug)]
 enum Proposition {
     Absurdum,
     Term(String),
@@ -130,7 +131,15 @@ impl Fitch {
 
     fn add_subproof(&mut self, prop: &Rc<Proposition>) {
         self.current_level += 1;
-        self.add_assumption(prop);
+        self.statements
+            .push((self.current_level, FitchComponent::Assumption(prop.clone())));
+    }
+
+    fn end_subproof(&mut self) {
+        if self.current_level == 0 {
+            return;
+        }
+        self.current_level -= 1;
     }
 
     fn delete_last_row(&mut self) {
@@ -204,11 +213,100 @@ impl Fitch {
         let a = self.statements.get(row).unwrap();
         self.statements.push((self.current_level, a.1.clone()));
     }
+
+    fn introduce_or(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
+        let assum = match self.statements.get(assum) {
+            Some(v) => v.1.unwrap(),
+            None => return false,
+        };
+
+        let ris = Proposition::new_or(assum, prop);
+        self.statements
+            .push((self.current_level, FitchComponent::Deduction(ris)));
+        true
+    }
+
+    fn get_subproof_result(&self, n: usize) -> Option<&Rc<Proposition>> {
+        let start = match self.statements.get(n) {
+            Some((level, FitchComponent::Assumption(_))) => level,
+            _ => return None,
+        };
+
+        for x in n + 1..self.statements.len() {
+            if x + 1 == self.statements.len() {
+                return Some(self.statements.get(x).unwrap().1.unwrap());
+            }
+
+            match self.statements.get(x + 1).unwrap() {
+                (level, FitchComponent::Assumption(_)) if level <= start => (),
+                (level, _) if level < start => (),
+                _ => continue,
+            }
+            return Some(self.statements.get(x).unwrap().1.unwrap());
+        }
+        return None;
+    }
+
+    fn eliminate_or(&mut self, assum: usize, left: usize, right: usize) -> bool {
+        if assum >= left || assum >= right {
+            return false;
+        }
+
+        let assum = match self.statements.get(assum) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+
+        let left_a = match self.statements.get(left) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+
+        let right_a = match self.statements.get(right) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+
+        match assum.borrow() {
+            Proposition::Or(ll, rr) => {
+                if !(ll == left_a && rr == right_a) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+
+        let left_sub = self.get_subproof_result(left);
+        let right_sub = self.get_subproof_result(right);
+        if left_sub.is_none() || left_sub != right_sub {
+            return false;
+        }
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(left_sub.unwrap().clone()),
+        ));
+        true
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Fitch, Proposition};
+
+    #[test]
+    fn introduce_and() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        fitch.add_assumption(&t0);
+        fitch.add_assumption(&t1);
+        let ris = fitch.introduce_and(0, 1);
+        assert!(ris);
+        assert_eq!(
+            *fitch.statements.get(2).unwrap().1.unwrap(),
+            Proposition::new_and(&t0, &t1)
+        );
+    }
 
     #[test]
     fn eliminate_and() {
@@ -221,5 +319,39 @@ mod tests {
         assert!(ris);
         let ris = fitch.eliminate_and(0, &Proposition::new_term("C"));
         assert!(!ris);
+    }
+
+    #[test]
+    fn introduce_or() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        fitch.add_assumption(&t0);
+        let ris = fitch.introduce_or(0, &t1);
+        assert!(ris);
+        assert_eq!(
+            *fitch.statements.get(1).unwrap().1.unwrap(),
+            Proposition::new_or(&t0, &t1)
+        );
+    }
+
+    #[test]
+    fn eliminate_or() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        let t2 = Proposition::new_term("C");
+        let t1_t2 = Proposition::new_or(&t1, &t2);
+        fitch.add_assumption(&t0);
+        fitch.add_assumption(&t1_t2);
+        fitch.add_subproof(&t1);
+        fitch.reiterate(0);
+        fitch.end_subproof();
+        fitch.add_subproof(&t2);
+        fitch.reiterate(0);
+        fitch.end_subproof();
+        let ris = fitch.eliminate_or(1, 2, 4);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t0);
     }
 }
