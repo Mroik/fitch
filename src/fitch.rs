@@ -405,6 +405,54 @@ impl Fitch {
         }
         true
     }
+
+    fn introduce_iff(&mut self, left_sub: usize, right_sub: usize) -> bool {
+        let left_start = match self.statements.get(left_sub) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+        let left_end = match self.get_subproof_result(left_sub) {
+            None => return false,
+            Some(v) => v,
+        };
+        let right_start = match self.statements.get(right_sub) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+        let right_end = match self.get_subproof_result(right_sub) {
+            None => return false,
+            Some(v) => v,
+        };
+
+        if !(left_start == right_end && left_end == right_start) {
+            return false;
+        }
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(Proposition::new_iff(left_start, right_start)),
+        ));
+        true
+    }
+
+    fn eliminate_iff(&mut self, assum: usize, truth: usize) -> bool {
+        let imp = match self.statements.get(assum) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+        let truth = match self.statements.get(truth) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+
+        let ris = match imp.borrow() {
+            Proposition::Iff(left, right) if left == truth => right,
+            Proposition::Iff(left, right) if right == truth => left,
+            _ => return false,
+        };
+
+        self.statements.push((self.current_level, FitchComponent::Deduction(ris.clone())));
+        true
+    }
 }
 
 #[cfg(test)]
@@ -527,7 +575,10 @@ mod tests {
         fitch.end_subproof();
         let ris = fitch.introduce_implies(1);
         assert!(ris);
-        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &Proposition::new_implies(&t0, &t1));
+        assert_eq!(
+            fitch.statements.last().unwrap().1.unwrap(),
+            &Proposition::new_implies(&t0, &t1)
+        );
     }
 
     #[test]
@@ -539,6 +590,37 @@ mod tests {
         fitch.add_assumption(&t0);
         fitch.add_assumption(&imp);
         let ris = fitch.eliminate_implies(1, 0);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
+    }
+
+    #[test]
+    fn introduce_iff() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        fitch.add_assumption(&t0);
+        fitch.add_assumption(&t1);
+        fitch.add_subproof(&t0);
+        fitch.reiterate(1);
+        fitch.end_subproof();
+        fitch.add_subproof(&t1);
+        fitch.reiterate(0);
+        fitch.end_subproof();
+        let ris = fitch.introduce_iff(2, 4);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &Proposition::new_iff(&t0, &t1));
+    }
+
+    #[test]
+    fn eliminate_iff() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        let bi = Proposition::new_iff(&t0, &t1);
+        fitch.add_assumption(&bi);
+        fitch.add_assumption(&t0);
+        let ris = fitch.eliminate_iff(0, 1);
         assert!(ris);
         assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
     }
