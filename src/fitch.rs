@@ -369,6 +369,42 @@ impl Fitch {
             .push((self.current_level, FitchComponent::Deduction(cur.clone())));
         true
     }
+
+    fn introduce_implies(&mut self, sub_proof: usize) -> bool {
+        let start = match self.statements.get(sub_proof) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+        let end = match self.get_subproof_result(sub_proof) {
+            None => return false,
+            Some(v) => v,
+        };
+
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(Proposition::new_implies(start, end)),
+        ));
+        true
+    }
+
+    fn eliminate_implies(&mut self, assum: usize, left: usize) -> bool {
+        let assum = match self.statements.get(assum) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+        let left = match self.statements.get(left) {
+            None => return false,
+            Some((_, v)) => v.unwrap(),
+        };
+
+        match assum.borrow() {
+            Proposition::Implies(l, r) if left == l => self
+                .statements
+                .push((self.current_level, FitchComponent::Deduction(r.clone()))),
+            _ => return false,
+        }
+        true
+    }
 }
 
 #[cfg(test)]
@@ -478,5 +514,32 @@ mod tests {
         let ris = fitch.eliminate_not(0);
         assert!(ris);
         assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t0);
+    }
+
+    #[test]
+    fn introduce_implies() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        fitch.add_assumption(&t1);
+        fitch.add_assumption(&t0);
+        fitch.reiterate(0);
+        fitch.end_subproof();
+        let ris = fitch.introduce_implies(1);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &Proposition::new_implies(&t0, &t1));
+    }
+
+    #[test]
+    fn eliminate_implies() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_term("A");
+        let t1 = Proposition::new_term("B");
+        let imp = Proposition::new_implies(&t0, &t1);
+        fitch.add_assumption(&t0);
+        fitch.add_assumption(&imp);
+        let ris = fitch.eliminate_implies(1, 0);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
     }
 }
