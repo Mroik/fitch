@@ -68,6 +68,7 @@ impl Proposition {
     }
 }
 
+#[derive(Clone)]
 enum FitchComponent {
     Assumption(Rc<Proposition>),
     Deduction(Rc<Proposition>),
@@ -178,6 +179,30 @@ impl Fitch {
             }
             _ => false,
         }
+    }
+
+    fn find_sub_assum(&self, row: usize) -> Option<usize> {
+        let level = match self.statements.get(row) {
+            None => return None,
+            Some((l, _)) => *l,
+        };
+        let cur = row - 1;
+        while cur < row {
+            match self.statements.get(cur).unwrap() {
+                (l, FitchComponent::Assumption(_)) if *l == level => return Some(cur),
+                _ => continue,
+            }
+        }
+        None
+    }
+
+    fn reiterate(&mut self, row: usize) {
+        if row >= self.statements.len() {
+            return;
+        }
+
+        let a = self.statements.get(row).unwrap();
+        self.statements.push((self.current_level, a.1.clone()));
     }
 }
 
