@@ -335,10 +335,13 @@ impl Fitch {
     }
 
     fn introduce_not(&mut self, sub_proof: usize) -> bool {
-        let sub_res = match self.get_subproof_result(sub_proof) {
+        match self.get_subproof_result(sub_proof) {
             None => return false,
-            Some(v) => v,
-        };
+            Some(v) => match v.borrow() {
+                Proposition::Absurdum => (),
+                _ => return false,
+            },
+        }
 
         let cur = self.statements.get(sub_proof).unwrap().1.unwrap();
         self.statements.push((
