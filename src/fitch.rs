@@ -95,6 +95,12 @@ struct Fitch {
 impl Display for Fitch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut res = String::new();
+        let mut temp = self.statements.len() as i32 - 1;
+        let mut max = 0;
+        while temp > 0 {
+            temp = temp / 10;
+            max += 1;
+        }
         self.statements
             .iter()
             .enumerate()
@@ -102,6 +108,21 @@ impl Display for Fitch {
                 if i == self.start_of_deductions {
                     res.push_str("------------------\n");
                 }
+
+                res.push(' ');
+                let mut temp = i as i32;
+                let mut white = 0;
+                while temp > 0 {
+                    temp = temp / 10;
+                    white += 1;
+                }
+
+                let white = max - white;
+                for _ in 0..white {
+                    res.push(' ');
+                }
+                res.push_str(format!("{} | ", i).as_str());
+
                 for _ in 0..*level {
                     res.push_str("    ");
                 }
