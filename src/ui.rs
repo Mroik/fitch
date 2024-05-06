@@ -13,6 +13,8 @@ use std::io::{stdout, Stdout};
 
 const INFO_AREA_HEIGHT: u16 = 3;
 
+// TODO Use tokio and use cancellation token if I ever decide to implement a solver (Taut CON, Ana
+// CON, etc.)
 pub struct Renderer {
     terminal: Terminal<CrosstermBackend<Stdout>>,
 }
@@ -41,6 +43,20 @@ impl Renderer {
 
                 frame.render_widget(fitch_widget, f_a);
                 frame.render_widget(info_widget, i_a);
+            })
+            .unwrap();
+    }
+
+    fn render_expression_box(&mut self, buffer: &str) {
+        self.terminal
+            .draw(|frame| {
+                let area = expression_box_area(frame.size());
+                let expression_widget = Paragraph::new(buffer).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded),
+                );
+                frame.render_widget(expression_widget, area);
             })
             .unwrap();
     }
