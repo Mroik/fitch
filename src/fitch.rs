@@ -86,7 +86,7 @@ impl FitchComponent {
 
 type Level = u32;
 
-struct Fitch {
+pub struct Fitch {
     statements: Vec<(Level, FitchComponent)>,
     start_of_deductions: usize,
     current_level: u32,
@@ -134,7 +134,7 @@ impl Display for Fitch {
 }
 
 impl Fitch {
-    fn new() -> Fitch {
+    pub fn new() -> Fitch {
         Fitch {
             statements: Vec::new(),
             start_of_deductions: 0,
@@ -142,7 +142,7 @@ impl Fitch {
         }
     }
 
-    fn add_assumption(&mut self, prop: &Rc<Proposition>) {
+    pub fn add_assumption(&mut self, prop: &Rc<Proposition>) {
         self.statements.insert(
             self.start_of_deductions,
             (0, FitchComponent::Assumption(prop.clone())),
@@ -150,20 +150,20 @@ impl Fitch {
         self.start_of_deductions += 1;
     }
 
-    fn add_subproof(&mut self, prop: &Rc<Proposition>) {
+    pub fn add_subproof(&mut self, prop: &Rc<Proposition>) {
         self.current_level += 1;
         self.statements
             .push((self.current_level, FitchComponent::Assumption(prop.clone())));
     }
 
-    fn end_subproof(&mut self) {
+    pub fn end_subproof(&mut self) {
         if self.current_level == 0 {
             return;
         }
         self.current_level -= 1;
     }
 
-    fn delete_last_row(&mut self) {
+    pub fn delete_last_row(&mut self) {
         self.statements.pop();
         if self.statements.len() < self.start_of_deductions {
             self.start_of_deductions = self.statements.len();
@@ -174,7 +174,7 @@ impl Fitch {
         }
     }
 
-    fn introduce_and(&mut self, left: usize, right: usize) -> bool {
+    pub fn introduce_and(&mut self, left: usize, right: usize) -> bool {
         let left = match self.statements.get(left) {
             Some(v) => v,
             None => return false,
@@ -190,7 +190,7 @@ impl Fitch {
         true
     }
 
-    fn eliminate_and(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
+    pub fn eliminate_and(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
         let assum = match self.statements.get(assum) {
             Some(v) => v.1.unwrap(),
             None => return false,
@@ -227,7 +227,7 @@ impl Fitch {
         None
     }
 
-    fn reiterate(&mut self, row: usize) {
+    pub fn reiterate(&mut self, row: usize) {
         if row >= self.statements.len() {
             return;
         }
@@ -236,7 +236,7 @@ impl Fitch {
         self.statements.push((self.current_level, a.1.clone()));
     }
 
-    fn introduce_or(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
+    pub fn introduce_or(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
         let assum = match self.statements.get(assum) {
             Some(v) => v.1.unwrap(),
             None => return false,
@@ -270,7 +270,7 @@ impl Fitch {
         return None;
     }
 
-    fn eliminate_or(&mut self, assum: usize, left: usize, right: usize) -> bool {
+    pub fn eliminate_or(&mut self, assum: usize, left: usize, right: usize) -> bool {
         if assum >= left || assum >= right {
             return false;
         }
@@ -311,7 +311,7 @@ impl Fitch {
         true
     }
 
-    fn introduce_absurdum(&mut self, ass1: usize, ass2: usize) -> bool {
+    pub fn introduce_absurdum(&mut self, ass1: usize, ass2: usize) -> bool {
         let a1 = match self.statements.get(ass1) {
             None => return false,
             Some(v) => v.1.unwrap(),
@@ -334,7 +334,7 @@ impl Fitch {
         true
     }
 
-    fn introduce_not(&mut self, sub_proof: usize) -> bool {
+    pub fn introduce_not(&mut self, sub_proof: usize) -> bool {
         match self.get_subproof_result(sub_proof) {
             None => return false,
             Some(v) => match v.borrow() {
@@ -355,7 +355,7 @@ impl Fitch {
         true
     }
 
-    fn eliminate_not(&mut self, row: usize) -> bool {
+    pub fn eliminate_not(&mut self, row: usize) -> bool {
         let cur = match self.statements.get(row) {
             None => return false,
             Some((_, v)) => v.unwrap(),
@@ -374,7 +374,7 @@ impl Fitch {
         true
     }
 
-    fn introduce_implies(&mut self, sub_proof: usize) -> bool {
+    pub fn introduce_implies(&mut self, sub_proof: usize) -> bool {
         let start = match self.statements.get(sub_proof) {
             None => return false,
             Some((_, v)) => v.unwrap(),
@@ -395,7 +395,7 @@ impl Fitch {
         true
     }
 
-    fn eliminate_implies(&mut self, assum: usize, left: usize) -> bool {
+    pub fn eliminate_implies(&mut self, assum: usize, left: usize) -> bool {
         let assum = match self.statements.get(assum) {
             None => return false,
             Some((_, v)) => v.unwrap(),
@@ -414,7 +414,7 @@ impl Fitch {
         true
     }
 
-    fn introduce_iff(&mut self, left_sub: usize, right_sub: usize) -> bool {
+    pub fn introduce_iff(&mut self, left_sub: usize, right_sub: usize) -> bool {
         let left_start = match self.statements.get(left_sub) {
             None => return false,
             Some((_, v)) => v.unwrap(),
@@ -442,7 +442,7 @@ impl Fitch {
         true
     }
 
-    fn eliminate_iff(&mut self, assum: usize, truth: usize) -> bool {
+    pub fn eliminate_iff(&mut self, assum: usize, truth: usize) -> bool {
         let imp = match self.statements.get(assum) {
             None => return false,
             Some((_, v)) => v.unwrap(),
