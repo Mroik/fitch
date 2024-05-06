@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, fmt::Display, rc::Rc};
 
 #[derive(Debug)]
-enum Proposition {
+pub enum Proposition {
     Absurdum,
     Term(String),
     And(Rc<Proposition>, Rc<Proposition>),
@@ -40,31 +40,31 @@ impl PartialEq for Proposition {
 }
 
 impl Proposition {
-    fn new_absurdum() -> Rc<Proposition> {
+    pub fn new_absurdum() -> Rc<Proposition> {
         Rc::new(Proposition::Absurdum)
     }
 
-    fn new_term(name: &str) -> Rc<Proposition> {
+    pub fn new_term(name: &str) -> Rc<Proposition> {
         Rc::new(Proposition::Term(name.to_string()))
     }
 
-    fn new_and(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
+    pub fn new_and(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
         Rc::new(Proposition::And(left.clone(), right.clone()))
     }
 
-    fn new_or(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
+    pub fn new_or(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
         Rc::new(Proposition::Or(left.clone(), right.clone()))
     }
 
-    fn new_not(prop: &Rc<Proposition>) -> Rc<Proposition> {
+    pub fn new_not(prop: &Rc<Proposition>) -> Rc<Proposition> {
         Rc::new(Proposition::Not(prop.clone()))
     }
 
-    fn new_implies(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
+    pub fn new_implies(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
         Rc::new(Proposition::Implies(left.clone(), right.clone()))
     }
 
-    fn new_iff(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
+    pub fn new_iff(left: &Rc<Proposition>, right: &Rc<Proposition>) -> Rc<Proposition> {
         Rc::new(Proposition::Iff(left.clone(), right.clone()))
     }
 }

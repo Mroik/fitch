@@ -34,7 +34,7 @@ impl App {
                     continue;
                 }
                 match key.code {
-                    _ => todo!()
+                    _ => todo!(),
                 }
             }
         }
