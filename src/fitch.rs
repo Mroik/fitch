@@ -343,6 +343,10 @@ impl Fitch {
             },
         }
 
+        if self.current_level != self.statements.get(sub_proof).unwrap().0 - 1 {
+            return false;
+        }
+
         let cur = self.statements.get(sub_proof).unwrap().1.unwrap();
         self.statements.push((
             self.current_level,
@@ -379,6 +383,10 @@ impl Fitch {
             None => return false,
             Some(v) => v,
         };
+
+        if self.current_level != self.statements.get(sub_proof).unwrap().0 - 1 {
+            return false;
+        }
 
         self.statements.push((
             self.current_level,
@@ -450,7 +458,8 @@ impl Fitch {
             _ => return false,
         };
 
-        self.statements.push((self.current_level, FitchComponent::Deduction(ris.clone())));
+        self.statements
+            .push((self.current_level, FitchComponent::Deduction(ris.clone())));
         true
     }
 }
@@ -569,8 +578,8 @@ mod tests {
         let mut fitch = Fitch::new();
         let t0 = Proposition::new_term("A");
         let t1 = Proposition::new_term("B");
-        fitch.add_assumption(&t1);
-        fitch.add_assumption(&t0);
+        fitch.add_subproof(&t1);
+        fitch.add_subproof(&t0);
         fitch.reiterate(0);
         fitch.end_subproof();
         let ris = fitch.introduce_implies(1);
@@ -609,7 +618,10 @@ mod tests {
         fitch.end_subproof();
         let ris = fitch.introduce_iff(2, 4);
         assert!(ris);
-        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &Proposition::new_iff(&t0, &t1));
+        assert_eq!(
+            fitch.statements.last().unwrap().1.unwrap(),
+            &Proposition::new_iff(&t0, &t1)
+        );
     }
 
     #[test]
