@@ -20,7 +20,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    fn new() -> std::io::Result<Renderer> {
+    pub fn new() -> std::io::Result<Renderer> {
         stdout().execute(EnterAlternateScreen)?;
         enable_raw_mode()?;
         let mut renderer = Renderer {
@@ -30,7 +30,7 @@ impl Renderer {
         Ok(renderer)
     }
 
-    fn render_fitch(&mut self, model: &Fitch) {
+    pub fn render_fitch(&mut self, model: &Fitch, info: &str) {
         self.terminal
             .draw(|frame| {
                 let (f_a, i_a) = base_area(frame.size());
@@ -39,7 +39,7 @@ impl Renderer {
                         .borders(Borders::ALL)
                         .border_type(BorderType::Rounded),
                 );
-                let info_widget = Paragraph::new(info_text());
+                let info_widget = Paragraph::new(info);
 
                 frame.render_widget(fitch_widget, f_a);
                 frame.render_widget(info_widget, i_a);
@@ -47,7 +47,7 @@ impl Renderer {
             .unwrap();
     }
 
-    fn render_expression_box(&mut self, buffer: &str) {
+    pub fn render_expression_box(&mut self, buffer: &str) {
         self.terminal
             .draw(|frame| {
                 let area = expression_box_area(frame.size());
@@ -67,15 +67,6 @@ impl Drop for Renderer {
         stdout().execute(LeaveAlternateScreen).unwrap();
         disable_raw_mode().unwrap();
     }
-}
-
-fn info_text() -> String {
-    // TODO fill info array
-    let info = [""];
-    info.iter().fold(String::new(), |mut acc, inf| {
-        acc.push_str(inf);
-        acc
-    })
 }
 
 fn base_area(whole: Rect) -> (Rect, Rect) {
