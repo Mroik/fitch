@@ -105,6 +105,11 @@ fn parse_or(queue: &str) -> Result {
 
 fn parse_not(queue: &str) -> Result {
     let mut queue = queue.trim_start();
+    if queue.is_empty() || queue.chars().nth(0).unwrap() != '(' {
+        return Result::Failure;
+    }
+    queue = queue[1..].trim_start();
+
     if queue.is_empty() || queue.chars().nth(0).unwrap() != '~' {
         return Result::Failure;
     }
@@ -112,7 +117,15 @@ fn parse_not(queue: &str) -> Result {
 
     match parse_expression(queue) {
         Result::Failure => Result::Failure,
-        Result::Success(t, rest) => Result::Success(Proposition::new_not(&t), rest),
+        Result::Success(t, rest) => {
+            queue = rest;
+            if queue.is_empty() || queue.chars().nth(0).unwrap() != ')' {
+                return Result::Failure;
+            }
+            queue = &queue[1..];
+
+            Result::Success(Proposition::new_not(&t), queue)
+        }
     }
 }
 
@@ -257,7 +270,7 @@ mod tests {
 
     #[test]
     fn parse_not_test() {
-        let queue = "  ~A  ";
+        let queue = "  (~A)  ";
         let a = Proposition::new_term("A");
         match parse_not(queue) {
             Result::Failure => assert!(false),
