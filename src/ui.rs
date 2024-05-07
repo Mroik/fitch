@@ -47,14 +47,15 @@ impl Renderer {
             .unwrap();
     }
 
-    pub fn render_expression_box(&mut self, buffer: &str) {
+    pub fn render_expression_box(&mut self, title: &str, buffer: &str) {
         self.terminal
             .draw(|frame| {
                 let area = expression_box_area(frame.size());
                 let expression_widget = Paragraph::new(buffer).block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_type(BorderType::Rounded),
+                        .border_type(BorderType::Rounded)
+                        .title(title),
                 );
                 frame.render_widget(expression_widget, area);
             })

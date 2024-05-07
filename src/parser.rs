@@ -1,7 +1,7 @@
 use crate::fitch::Proposition;
 use std::rc::Rc;
 
-enum Result<'a> {
+pub enum Result<'a> {
     Success(Rc<Proposition>, &'a str),
     Failure,
 }
@@ -178,7 +178,7 @@ fn parse_iff(queue: &str) -> Result {
     }
 }
 
-fn parse_expression(queue: &str) -> Result {
+pub fn parse_expression(queue: &str) -> Result {
     let queue = queue.trim_start();
     [
         parse_term,

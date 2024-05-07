@@ -1,12 +1,17 @@
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
-use crate::{fitch::Fitch, ui::Renderer};
+use crate::{
+    fitch::Fitch,
+    parser::{self, parse_expression},
+    ui::Renderer,
+};
 
 struct App {
     model: Fitch,
     renderer: Renderer,
     state: State,
     expression_buffer: String,
+    info_buffer: String,
 }
 
 impl App {
@@ -16,6 +21,7 @@ impl App {
             renderer: Renderer::new()?,
             state: State::Noraml,
             expression_buffer: String::new(),
+            info_buffer: String::new(),
         };
         app.render();
         Ok(app)
@@ -24,7 +30,10 @@ impl App {
     fn render(&mut self) {
         self.renderer.render_fitch(&self.model, &self.info_text());
         match self.state {
-            State::Noraml => self.renderer.render_expression_box(&self.expression_buffer),
+            State::Noraml => (),
+            State::AddAssumption => self
+                .renderer
+                .render_expression_box("Assumption expression", &self.expression_buffer),
             _ => (),
         }
     }
@@ -42,11 +51,36 @@ impl App {
 
                 match self.state {
                     State::Noraml => self.listen_normal(&key.code),
+                    State::AddAssumption => self.listen_add_assumption(&key.code),
                     _ => todo!(),
                 }
             }
 
             self.render();
+            self.info_buffer.clear();
+        }
+    }
+
+    fn listen_add_assumption(&mut self, code: &KeyCode) {
+        match code {
+            KeyCode::Enter => match parse_expression(&self.expression_buffer) {
+                parser::Result::Failure => {
+                    self.info_buffer.push_str("Expression entered is invalid")
+                }
+                parser::Result::Success(expr, _) => {
+                    self.model.add_assumption(&expr);
+                    self.state = State::Noraml;
+                }
+            },
+            KeyCode::Backspace if !self.expression_buffer.is_empty() => {
+                self.expression_buffer.pop();
+            }
+            KeyCode::Char(c) => self.expression_buffer.push(*c),
+            KeyCode::Esc => {
+                self.expression_buffer.clear();
+                self.state = State::Noraml
+            }
+            _ => (),
         }
     }
 
@@ -73,6 +107,7 @@ impl App {
             ]
             .join("   ")
             .to_string(),
+            State::AddAssumption => self.info_buffer.clone(),
             _ => "".to_string(),
         }
     }
