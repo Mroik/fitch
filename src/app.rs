@@ -10,6 +10,7 @@ pub struct App {
     renderer: Renderer,
     state: State,
     expression_buffer: String,
+    expression_cursor: u16,
     info_buffer: String,
 }
 
@@ -20,6 +21,7 @@ impl App {
             renderer: Renderer::new()?,
             state: State::Noraml,
             expression_buffer: String::new(),
+            expression_cursor: 0,
             info_buffer: String::new(),
         };
         app.render();
@@ -32,11 +34,12 @@ impl App {
             State::AddSubproof => ("Subproof expression", true),
             _ => ("", false),
         };
-        self.renderer.render_fitch(
+        self.renderer.render(
             &self.model,
             &self.info_text(),
             title,
             &self.expression_buffer,
+            self.expression_cursor,
             render_box,
         );
     }
@@ -74,6 +77,7 @@ impl App {
                 app_context.model.add_subproof(&expr);
                 app_context.state = State::Noraml;
                 app_context.expression_buffer.clear();
+                app_context.expression_cursor = 0;
             }
         };
 
@@ -89,6 +93,7 @@ impl App {
                 app_context.model.add_assumption(&expr);
                 app_context.state = State::Noraml;
                 app_context.expression_buffer.clear();
+                app_context.expression_cursor = 0;
             }
         };
 
@@ -123,12 +128,23 @@ impl App {
                 handler(self, res);
             }
             KeyCode::Backspace if !self.expression_buffer.is_empty() => {
-                self.expression_buffer.pop();
+                if self.expression_cursor > 0 {
+                    self.expression_buffer
+                        .remove(self.expression_cursor as usize - 1);
+                    self.expression_cursor -= 1;
+                }
             }
-            KeyCode::Char(c) => self.expression_buffer.push(*c),
+            KeyCode::Char(c) => {
+                self.expression_buffer.push(*c);
+                self.expression_cursor += 1;
+            }
             KeyCode::Esc => {
                 self.expression_buffer.clear();
                 self.state = State::Noraml
+            }
+            KeyCode::Left if self.expression_cursor > 0 => self.expression_cursor -= 1,
+            KeyCode::Right if (self.expression_cursor as usize) < self.expression_buffer.len() => {
+                self.expression_cursor += 1
             }
             _ => (),
         }

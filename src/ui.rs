@@ -30,12 +30,13 @@ impl Renderer {
         Ok(renderer)
     }
 
-    pub fn render_fitch(
+    pub fn render(
         &mut self,
         model: &Fitch,
         info: &str,
         title: &str,
         buffer: &str,
+        cursor_offset: u16,
         render_box: bool,
     ) {
         self.terminal
@@ -64,7 +65,7 @@ impl Renderer {
                         .title(title),
                 );
                 frame.render_widget(expression_widget, area);
-                frame.set_cursor(area.left() + 1 + buffer.len() as u16, area.top() + 1);
+                frame.set_cursor(area.left() + 1 + cursor_offset as u16, area.top() + 1);
             })
             .unwrap();
     }
