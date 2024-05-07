@@ -11,12 +11,14 @@ struct App {
 
 impl App {
     fn new() -> std::io::Result<App> {
-        Ok(App {
+        let mut app = App {
             model: Fitch::new(),
             renderer: Renderer::new()?,
             state: State::Noraml,
             expression_buffer: String::new(),
-        })
+        };
+        app.render();
+        Ok(app)
     }
 
     fn render(&mut self) {
@@ -29,14 +31,33 @@ impl App {
 
     fn listen(&mut self) {
         loop {
+            if self.state == State::Quit {
+                break;
+            }
+
             if let Event::Key(key) = event::read().unwrap() {
                 if key.kind != KeyEventKind::Press {
                     continue;
                 }
-                match key.code {
+
+                match self.state {
+                    State::Noraml => self.listen_normal(&key.code),
                     _ => todo!(),
                 }
             }
+
+            self.render();
+        }
+    }
+
+    fn listen_normal(&mut self, code: &KeyCode) {
+        match code {
+            KeyCode::Char('i') => self.state = State::IntroduceChoice,
+            KeyCode::Char('e') => self.state = State::EliminateChoice,
+            KeyCode::Char('a') => self.state = State::AddAssumption,
+            KeyCode::Char('s') => self.state = State::AddSubproof,
+            KeyCode::Char('q') => self.state = State::Quit,
+            _ => (),
         }
     }
 
@@ -48,6 +69,7 @@ impl App {
                 "add [a]ssumption",
                 "add [s]ubproof",
                 "[d]elete last row",
+                "[q]uit",
             ]
             .join("   ")
             .to_string(),
@@ -56,21 +78,29 @@ impl App {
     }
 }
 
+#[derive(PartialEq)]
 enum State {
     Noraml,
+    IntroduceChoice,
+    EliminateChoice,
+    AddAssumption,
+    AddSubproof,
     AbsurdumState(AbsurdumState),
     AndState(AndState),
     OrState(OrState),
     NotState(NotState),
     ImpliesState(ImpliesState),
     IffState(IffState),
+    Quit,
 }
 
+#[derive(PartialEq)]
 enum AbsurdumState {
     IntroduceGetAssumption1,
     IntroduceGetAssumption2(usize),
 }
 
+#[derive(PartialEq)]
 enum AndState {
     IntroduceGetLeftAssumption,
     IntroduceGetRightAssumption(usize),
@@ -78,6 +108,7 @@ enum AndState {
     EliminateGetProposition(usize),
 }
 
+#[derive(PartialEq)]
 enum OrState {
     IntroduceGetAssumption,
     IntroduceGetProposition(usize),
@@ -86,17 +117,20 @@ enum OrState {
     EliminateGetRightSubproof(usize, usize),
 }
 
+#[derive(PartialEq)]
 enum NotState {
     Introduce,
     Eliminate,
 }
 
+#[derive(PartialEq)]
 enum ImpliesState {
     Introduce,
     EliminateGetAssumption,
     EliminateGetLeft(usize),
 }
 
+#[derive(PartialEq)]
 enum IffState {
     IntroduceGetLeftSubproof,
     IntroduceGetRightSubproof(usize),
