@@ -1,6 +1,7 @@
 use crate::fitch::Proposition;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum Result<'a> {
     Success(Rc<Proposition>, &'a str),
     Failure,

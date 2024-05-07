@@ -1,10 +1,9 @@
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-
 use crate::{
     fitch::Fitch,
     parser::{self, parse_expression},
     ui::Renderer,
 };
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 
 pub struct App {
     model: Fitch,
@@ -67,51 +66,33 @@ impl App {
     }
 
     fn listen_add_subproof(&mut self, code: &KeyCode) {
-        match code {
-            KeyCode::Enter => match parse_expression(&self.expression_buffer) {
-                parser::Result::Failure => {
-                    self.info_buffer.push_str("Expression entered is invalid")
-                }
-                parser::Result::Success(expr, _) => {
-                    self.model.add_subproof(&expr);
-                    self.state = State::Noraml;
-                    self.expression_buffer.clear();
-                }
-            },
-            KeyCode::Backspace if !self.expression_buffer.is_empty() => {
-                self.expression_buffer.pop();
+        let handler = |app_context: &mut App, result: parser::Result| match result {
+            parser::Result::Failure => app_context
+                .info_buffer
+                .push_str("Expression entered is invalid"),
+            parser::Result::Success(expr, _) => {
+                app_context.model.add_subproof(&expr);
+                app_context.state = State::Noraml;
+                app_context.expression_buffer.clear();
             }
-            KeyCode::Char(c) => self.expression_buffer.push(*c),
-            KeyCode::Esc => {
-                self.expression_buffer.clear();
-                self.state = State::Noraml
-            }
-            _ => (),
-        }
+        };
+
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_add_assumption(&mut self, code: &KeyCode) {
-        match code {
-            KeyCode::Enter => match parse_expression(&self.expression_buffer) {
-                parser::Result::Failure => {
-                    self.info_buffer.push_str("Expression entered is invalid")
-                }
-                parser::Result::Success(expr, _) => {
-                    self.model.add_assumption(&expr);
-                    self.state = State::Noraml;
-                    self.expression_buffer.clear();
-                }
-            },
-            KeyCode::Backspace if !self.expression_buffer.is_empty() => {
-                self.expression_buffer.pop();
+        let handler = |app_context: &mut App, result: parser::Result| match result {
+            parser::Result::Failure => app_context
+                .info_buffer
+                .push_str("Expression entered is invalid"),
+            parser::Result::Success(expr, _) => {
+                app_context.model.add_assumption(&expr);
+                app_context.state = State::Noraml;
+                app_context.expression_buffer.clear();
             }
-            KeyCode::Char(c) => self.expression_buffer.push(*c),
-            KeyCode::Esc => {
-                self.expression_buffer.clear();
-                self.state = State::Noraml
-            }
-            _ => (),
-        }
+        };
+
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_normal(&mut self, code: &KeyCode) {
@@ -123,6 +104,32 @@ impl App {
             KeyCode::Char('n') => self.model.end_subproof(),
             KeyCode::Char('d') => self.model.delete_last_row(),
             KeyCode::Char('q') => self.state = State::Quit,
+            _ => (),
+        }
+    }
+
+    // Not sure if it avoids much code duplication. It also requires a clone thus another
+    // allocation. If it starts to become bothersome just revert this code section to
+    // 103cd74bd33e8bb550512cb745b2ff6bf89e35e1
+    fn handle_expression_box_event(
+        &mut self,
+        code: &KeyCode,
+        mut handler: impl FnMut(&mut App, parser::Result),
+    ) {
+        match code {
+            KeyCode::Enter => {
+                let buf = self.expression_buffer.clone();
+                let res = parse_expression(&buf);
+                handler(self, res);
+            }
+            KeyCode::Backspace if !self.expression_buffer.is_empty() => {
+                self.expression_buffer.pop();
+            }
+            KeyCode::Char(c) => self.expression_buffer.push(*c),
+            KeyCode::Esc => {
+                self.expression_buffer.clear();
+                self.state = State::Noraml
+            }
             _ => (),
         }
     }
@@ -141,6 +148,7 @@ impl App {
             .join("   ")
             .to_string(),
             State::AddAssumption => self.info_buffer.clone(),
+            State::AddSubproof => self.info_buffer.clone(),
             _ => "".to_string(),
         }
     }
