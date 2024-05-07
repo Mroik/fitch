@@ -30,6 +30,7 @@ impl App {
     fn render(&mut self) {
         let (title, render_box) = match self.state {
             State::AddAssumption => ("Assumption expression", true),
+            State::AddSubproof => ("Subproof expression", true),
             _ => ("", false),
         };
         self.renderer.render_fitch(
@@ -55,12 +56,37 @@ impl App {
                 match self.state {
                     State::Noraml => self.listen_normal(&key.code),
                     State::AddAssumption => self.listen_add_assumption(&key.code),
+                    State::AddSubproof => self.listen_add_subproof(&key.code),
                     _ => todo!(),
                 }
             }
 
             self.render();
             self.info_buffer.clear();
+        }
+    }
+
+    fn listen_add_subproof(&mut self, code: &KeyCode) {
+        match code {
+            KeyCode::Enter => match parse_expression(&self.expression_buffer) {
+                parser::Result::Failure => {
+                    self.info_buffer.push_str("Expression entered is invalid")
+                }
+                parser::Result::Success(expr, _) => {
+                    self.model.add_subproof(&expr);
+                    self.state = State::Noraml;
+                    self.expression_buffer.clear();
+                }
+            },
+            KeyCode::Backspace if !self.expression_buffer.is_empty() => {
+                self.expression_buffer.pop();
+            }
+            KeyCode::Char(c) => self.expression_buffer.push(*c),
+            KeyCode::Esc => {
+                self.expression_buffer.clear();
+                self.state = State::Noraml
+            }
+            _ => (),
         }
     }
 
@@ -73,6 +99,7 @@ impl App {
                 parser::Result::Success(expr, _) => {
                     self.model.add_assumption(&expr);
                     self.state = State::Noraml;
+                    self.expression_buffer.clear();
                 }
             },
             KeyCode::Backspace if !self.expression_buffer.is_empty() => {
@@ -93,6 +120,8 @@ impl App {
             KeyCode::Char('e') => self.state = State::EliminateChoice,
             KeyCode::Char('a') => self.state = State::AddAssumption,
             KeyCode::Char('s') => self.state = State::AddSubproof,
+            KeyCode::Char('n') => self.model.end_subproof(),
+            KeyCode::Char('d') => self.model.delete_last_row(),
             KeyCode::Char('q') => self.state = State::Quit,
             _ => (),
         }
@@ -105,6 +134,7 @@ impl App {
                 "[e]liminate",
                 "add [a]ssumption",
                 "add [s]ubproof",
+                "e[n]d subproof",
                 "[d]elete last row",
                 "[q]uit",
             ]
