@@ -46,7 +46,7 @@ fn parse_and(queue: &str) -> Result {
     }
     let queue = queue[1..].trim_start();
 
-    match parse_term(queue) {
+    match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
             let queue = rest.trim_start();
@@ -55,7 +55,7 @@ fn parse_and(queue: &str) -> Result {
             }
             let queue = queue[1..].trim_start();
 
-            match parse_term(queue) {
+            match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
                     let queue = rest.trim_start();
@@ -78,7 +78,7 @@ fn parse_or(queue: &str) -> Result {
     }
     let queue = queue[1..].trim_start();
 
-    match parse_term(queue) {
+    match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
             let queue = rest.trim_start();
@@ -87,7 +87,7 @@ fn parse_or(queue: &str) -> Result {
             }
             let queue = queue[1..].trim_start();
 
-            match parse_term(queue) {
+            match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
                     let queue = rest.trim_start();
@@ -110,7 +110,7 @@ fn parse_not(queue: &str) -> Result {
     }
     let queue = queue[1..].trim_start();
 
-    match parse_term(queue) {
+    match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(t, rest) => Result::Success(Proposition::new_not(&t), rest),
     }
@@ -123,7 +123,7 @@ fn parse_implies(queue: &str) -> Result {
     }
     let queue = queue[1..].trim_start();
 
-    match parse_term(queue) {
+    match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
             let queue = rest.trim_start();
@@ -132,7 +132,7 @@ fn parse_implies(queue: &str) -> Result {
             }
             let queue = queue[2..].trim_start();
 
-            match parse_term(queue) {
+            match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
                     let queue = rest.trim_start();
@@ -154,7 +154,7 @@ fn parse_iff(queue: &str) -> Result {
     }
     let queue = queue[1..].trim_start();
 
-    match parse_term(queue) {
+    match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
             let queue = rest.trim_start();
@@ -163,7 +163,7 @@ fn parse_iff(queue: &str) -> Result {
             }
             let queue = queue[3..].trim_start();
 
-            match parse_term(queue) {
+            match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
                     let queue = rest.trim_start();
@@ -178,9 +178,37 @@ fn parse_iff(queue: &str) -> Result {
     }
 }
 
+fn parse_expression(queue: &str) -> Result {
+    let queue = queue.trim_start();
+    match parse_absurdum(queue) {
+        Result::Success(r, rest) => Result::Success(r, rest),
+        Result::Failure => match parse_term(queue) {
+            Result::Success(r, rest) => Result::Success(r, rest),
+            Result::Failure => match parse_and(queue) {
+                Result::Success(r, rest) => Result::Success(r, rest),
+                Result::Failure => match parse_or(queue) {
+                    Result::Success(r, rest) => Result::Success(r, rest),
+                    Result::Failure => match parse_not(queue) {
+                        Result::Success(r, rest) => Result::Success(r, rest),
+                        Result::Failure => match parse_implies(queue) {
+                            Result::Success(r, rest) => Result::Success(r, rest),
+                            Result::Failure => match parse_iff(queue) {
+                                Result::Success(r, rest) => Result::Success(r, rest),
+                                Result::Failure => Result::Failure,
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_absurdum, parse_and, parse_iff, parse_implies, parse_not, parse_or, parse_term, Result};
+    use super::{
+        parse_absurdum, parse_and, parse_expression, parse_iff, parse_implies, parse_not, parse_or, parse_term, Result
+    };
     use crate::fitch::Proposition;
 
     #[test]
@@ -271,6 +299,23 @@ mod tests {
             Result::Failure => assert!(false),
             Result::Success(p, rest) => {
                 assert_eq!(p, Proposition::new_iff(&a, &b));
+                assert_eq!(rest, "  ");
+            }
+        }
+    }
+
+    #[test]
+    fn parse_expression_test() {
+        let a = Proposition::new_term("A");
+        let b = Proposition::new_term("B");
+        let left = Proposition::new_or(&a, &b);
+        let right = Proposition::new_and(&a, &b);
+        let ris = Proposition::new_and(&left, &right);
+        let queue = "  ((A v B) ^ (A ^ B))  ";
+        match parse_expression(queue) {
+            Result::Failure => assert!(false),
+            Result::Success(p, rest) => {
+                assert_eq!(p, ris);
                 assert_eq!(rest, "  ");
             }
         }
