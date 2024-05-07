@@ -180,34 +180,26 @@ fn parse_iff(queue: &str) -> Result {
 
 fn parse_expression(queue: &str) -> Result {
     let queue = queue.trim_start();
-    match parse_absurdum(queue) {
-        Result::Success(r, rest) => Result::Success(r, rest),
-        Result::Failure => match parse_term(queue) {
-            Result::Success(r, rest) => Result::Success(r, rest),
-            Result::Failure => match parse_and(queue) {
-                Result::Success(r, rest) => Result::Success(r, rest),
-                Result::Failure => match parse_or(queue) {
-                    Result::Success(r, rest) => Result::Success(r, rest),
-                    Result::Failure => match parse_not(queue) {
-                        Result::Success(r, rest) => Result::Success(r, rest),
-                        Result::Failure => match parse_implies(queue) {
-                            Result::Success(r, rest) => Result::Success(r, rest),
-                            Result::Failure => match parse_iff(queue) {
-                                Result::Success(r, rest) => Result::Success(r, rest),
-                                Result::Failure => Result::Failure,
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    }
+    [
+        parse_term,
+        parse_and,
+        parse_or,
+        parse_not,
+        parse_implies,
+        parse_iff,
+    ]
+    .iter()
+    .fold(parse_absurdum(queue), |acc, func| match acc {
+        Result::Success(_, _) => acc,
+        Result::Failure => func(queue),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_absurdum, parse_and, parse_expression, parse_iff, parse_implies, parse_not, parse_or, parse_term, Result
+        parse_absurdum, parse_and, parse_expression, parse_iff, parse_implies, parse_not, parse_or,
+        parse_term, Result,
     };
     use crate::fitch::Proposition;
 
