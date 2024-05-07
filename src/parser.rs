@@ -40,30 +40,30 @@ fn parse_term(queue: &str) -> Result {
 }
 
 fn parse_and(queue: &str) -> Result {
-    let queue = queue.trim_start();
+    let mut queue = queue.trim_start();
     if queue.is_empty() || queue.chars().nth(0).unwrap() != '(' {
         return Result::Failure;
     }
-    let queue = queue[1..].trim_start();
+    queue = queue[1..].trim_start();
 
     match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
-            let queue = rest.trim_start();
+            queue = rest.trim_start();
             if queue.is_empty() || queue.chars().nth(0).unwrap() != '^' {
                 return Result::Failure;
             }
-            let queue = queue[1..].trim_start();
+            queue = queue[1..].trim_start();
 
             match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
-                    let queue = rest.trim_start();
+                    queue = rest.trim_start();
                     if queue.is_empty() || queue.chars().nth(0).unwrap() != ')' {
                         return Result::Failure;
                     }
 
-                    let queue = &queue[1..];
+                    queue = &queue[1..];
                     Result::Success(Proposition::new_and(&left, &right), queue)
                 }
             }
@@ -72,30 +72,30 @@ fn parse_and(queue: &str) -> Result {
 }
 
 fn parse_or(queue: &str) -> Result {
-    let queue = queue.trim_start();
+    let mut queue = queue.trim_start();
     if queue.is_empty() || queue.chars().nth(0).unwrap() != '(' {
         return Result::Failure;
     }
-    let queue = queue[1..].trim_start();
+    queue = queue[1..].trim_start();
 
     match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
-            let queue = rest.trim_start();
+            queue = rest.trim_start();
             if queue.is_empty() || queue.chars().nth(0).unwrap() != 'v' {
                 return Result::Failure;
             }
-            let queue = queue[1..].trim_start();
+            queue = queue[1..].trim_start();
 
             match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
-                    let queue = rest.trim_start();
+                    queue = rest.trim_start();
                     if queue.is_empty() || queue.chars().nth(0).unwrap() != ')' {
                         return Result::Failure;
                     }
 
-                    let queue = &queue[1..];
+                    queue = &queue[1..];
                     Result::Success(Proposition::new_or(&left, &right), queue)
                 }
             }
@@ -104,11 +104,11 @@ fn parse_or(queue: &str) -> Result {
 }
 
 fn parse_not(queue: &str) -> Result {
-    let queue = queue.trim_start();
+    let mut queue = queue.trim_start();
     if queue.is_empty() || queue.chars().nth(0).unwrap() != '~' {
         return Result::Failure;
     }
-    let queue = queue[1..].trim_start();
+    queue = queue[1..].trim_start();
 
     match parse_expression(queue) {
         Result::Failure => Result::Failure,
@@ -117,29 +117,29 @@ fn parse_not(queue: &str) -> Result {
 }
 
 fn parse_implies(queue: &str) -> Result {
-    let queue = queue.trim_start();
+    let mut queue = queue.trim_start();
     if queue.is_empty() || queue.chars().nth(0).unwrap() != '(' {
         return Result::Failure;
     }
-    let queue = queue[1..].trim_start();
+    queue = queue[1..].trim_start();
 
     match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
-            let queue = rest.trim_start();
+            queue = rest.trim_start();
             if queue.len() < 2 || &queue[0..2] != "=>" {
                 return Result::Failure;
             }
-            let queue = queue[2..].trim_start();
+            queue = queue[2..].trim_start();
 
             match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
-                    let queue = rest.trim_start();
+                    queue = rest.trim_start();
                     if queue.is_empty() || queue.chars().nth(0).unwrap() != ')' {
                         return Result::Failure;
                     }
-                    let queue = &queue[1..];
+                    queue = &queue[1..];
                     Result::Success(Proposition::new_implies(&left, &right), queue)
                 }
             }
@@ -148,29 +148,29 @@ fn parse_implies(queue: &str) -> Result {
 }
 
 fn parse_iff(queue: &str) -> Result {
-    let queue = queue.trim_start();
+    let mut queue = queue.trim_start();
     if queue.is_empty() || queue.chars().nth(0).unwrap() != '(' {
         return Result::Failure;
     }
-    let queue = queue[1..].trim_start();
+    queue = queue[1..].trim_start();
 
     match parse_expression(queue) {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
-            let queue = rest.trim_start();
+            queue = rest.trim_start();
             if queue.len() < 3 || &queue[0..3] != "<=>" {
                 return Result::Failure;
             }
-            let queue = queue[3..].trim_start();
+            queue = queue[3..].trim_start();
 
             match parse_expression(queue) {
                 Result::Failure => Result::Failure,
                 Result::Success(right, rest) => {
-                    let queue = rest.trim_start();
+                    queue = rest.trim_start();
                     if queue.is_empty() || queue.chars().nth(0).unwrap() != ')' {
                         return Result::Failure;
                     }
-                    let queue = &queue[1..];
+                    queue = &queue[1..];
                     Result::Success(Proposition::new_iff(&left, &right), queue)
                 }
             }
