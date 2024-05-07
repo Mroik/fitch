@@ -30,7 +30,14 @@ impl Renderer {
         Ok(renderer)
     }
 
-    pub fn render_fitch(&mut self, model: &Fitch, info: &str) {
+    pub fn render_fitch(
+        &mut self,
+        model: &Fitch,
+        info: &str,
+        title: &str,
+        buffer: &str,
+        render_box: bool,
+    ) {
         self.terminal
             .draw(|frame| {
                 let (f_a, i_a) = base_area(frame.size());
@@ -43,13 +50,12 @@ impl Renderer {
 
                 frame.render_widget(fitch_widget, f_a);
                 frame.render_widget(info_widget, i_a);
-            })
-            .unwrap();
-    }
 
-    pub fn render_expression_box(&mut self, title: &str, buffer: &str) {
-        self.terminal
-            .draw(|frame| {
+                if !render_box {
+                    return;
+                }
+
+                // Render expression BOX
                 let area = expression_box_area(frame.size());
                 let expression_widget = Paragraph::new(buffer).block(
                     Block::default()

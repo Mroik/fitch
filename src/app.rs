@@ -28,14 +28,17 @@ impl App {
     }
 
     fn render(&mut self) {
-        self.renderer.render_fitch(&self.model, &self.info_text());
-        match self.state {
-            State::Noraml => (),
-            State::AddAssumption => self
-                .renderer
-                .render_expression_box("Assumption expression", &self.expression_buffer),
-            _ => (),
-        }
+        let (title, render_box) = match self.state {
+            State::AddAssumption => ("Assumption expression", true),
+            _ => ("", false),
+        };
+        self.renderer.render_fitch(
+            &self.model,
+            &self.info_text(),
+            title,
+            &self.expression_buffer,
+            render_box,
+        );
     }
 
     pub fn listen(&mut self) {
