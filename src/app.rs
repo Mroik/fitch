@@ -63,6 +63,7 @@ impl App {
                     State::AddAssumption => self.listen_add_assumption(&key.code),
                     State::AddSubproof => self.listen_add_subproof(&key.code),
                     State::IntroduceChoice => self.listen_introduce(&key.code),
+                    State::EliminateChoice => self.listen_eliminate(&key.code),
                     State::AbsurdumState(_) => self.listen_absurdum(&key.code),
                     _ => todo!(),
                 }
@@ -109,10 +110,49 @@ impl App {
                     }
                 }
             }
-            // TODO Eliminate absurdum
+            State::AbsurdumState(AbsurdumState::EliminateGetAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(assum) => {
+                        app_context.state =
+                            State::AbsurdumState(AbsurdumState::EliminateGetProposition(assum));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::AbsurdumState(AbsurdumState::EliminateGetProposition(assum)) => {
+                match parse_expression(&app_context.expression_buffer) {
+                    parser::Result::Failure => app_context
+                        .info_buffer
+                        .push_str("Expression entered is invalid"),
+                    parser::Result::Success(ded, _) => {
+                        if !app_context.model.eliminate_absurdum(assum, &ded) {
+                            app_context
+                                .info_buffer
+                                .push_str("The assumption you selected is not an absurdum");
+                            app_context.warning = true;
+                        }
+                        app_context.reset_expression_box();
+                        app_context.state = State::Noraml;
+                    }
+                }
+            }
             _ => (),
         };
         self.handle_expression_box_event(code, handler);
+    }
+
+    fn listen_eliminate(&mut self, code: &KeyCode) {
+        match code {
+            KeyCode::Char('a') => {
+                self.state = State::AbsurdumState(AbsurdumState::EliminateGetAssumption)
+            }
+            _ => (),
+        }
     }
 
     fn listen_introduce(&mut self, code: &KeyCode) {
@@ -218,7 +258,7 @@ impl App {
             ]
             .join("   ")
             .to_string(),
-            State::IntroduceChoice => {
+            State::IntroduceChoice | State::EliminateChoice => {
                 ["[a]bsurdum", "a[n]d", "[o]r", "no[t]", "[i]mplies", "i[f]f"]
                     .join("    ")
                     .to_string()
