@@ -334,6 +334,21 @@ impl Fitch {
         true
     }
 
+    pub fn eliminate_absurdum(&mut self, absurdum: usize, introduce: &Rc<Proposition>) -> bool {
+        match self.statements.get(absurdum) {
+            Some((level, m))
+                if m.unwrap() == &Proposition::new_absurdum() && *level <= self.current_level =>
+            {
+                self.statements.push((
+                    self.current_level,
+                    FitchComponent::Deduction(introduce.clone()),
+                ));
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn introduce_not(&mut self, sub_proof: usize) -> bool {
         match self.get_subproof_result(sub_proof) {
             None => return false,
@@ -543,6 +558,17 @@ mod tests {
             fitch.statements.last().unwrap().1.unwrap(),
             &Proposition::new_absurdum()
         );
+    }
+
+    #[test]
+    fn eliminate_absurdum() {
+        let mut fitch = Fitch::new();
+        let t0 = Proposition::new_absurdum();
+        let t1 = Proposition::new_term("A");
+        fitch.add_assumption(&t0);
+        let ris = fitch.eliminate_absurdum(0, &t1);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
     }
 
     #[test]

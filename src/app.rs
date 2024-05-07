@@ -98,6 +98,8 @@ enum State {
 enum AbsurdumState {
     IntroduceGetAssumption1,
     IntroduceGetAssumption2(usize),
+    EliminateGetAssumption,
+    EliminateGetProposition(usize),
 }
 
 #[derive(PartialEq)]
