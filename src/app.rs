@@ -12,6 +12,7 @@ pub struct App {
     expression_buffer: String,
     expression_cursor: u16,
     info_buffer: String,
+    warning: bool,
 }
 
 impl App {
@@ -23,6 +24,7 @@ impl App {
             expression_buffer: String::new(),
             expression_cursor: 0,
             info_buffer: String::new(),
+            warning: false,
         };
         app.render();
         Ok(app)
@@ -32,6 +34,7 @@ impl App {
         let (title, render_box) = match self.state {
             State::AddAssumption => ("Assumption expression", true),
             State::AddSubproof => ("Subproof expression", true),
+            State::AbsurdumState(_) => ("Assumption index", true),
             _ => ("", false),
         };
         self.renderer.render(
@@ -59,44 +62,99 @@ impl App {
                     State::Noraml => self.listen_normal(&key.code),
                     State::AddAssumption => self.listen_add_assumption(&key.code),
                     State::AddSubproof => self.listen_add_subproof(&key.code),
+                    State::IntroduceChoice => self.listen_introduce(&key.code),
+                    State::AbsurdumState(_) => self.listen_absurdum(&key.code),
                     _ => todo!(),
                 }
             }
 
             self.render();
             self.info_buffer.clear();
+            self.warning = false;
+        }
+    }
+
+    fn listen_absurdum(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.state {
+            State::AbsurdumState(AbsurdumState::IntroduceGetAssumption1) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(v) => {
+                        app_context.state =
+                            State::AbsurdumState(AbsurdumState::IntroduceGetAssumption2(v));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::AbsurdumState(AbsurdumState::IntroduceGetAssumption2(a1)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(a2) => {
+                        if !app_context.model.introduce_absurdum(a1, a2) {
+                            app_context
+                                .info_buffer
+                                .push_str("The input index are not valid");
+                            app_context.warning = true;
+                        }
+                        app_context.reset_expression_box();
+                        app_context.state = State::Noraml;
+                    }
+                }
+            }
+            // TODO Eliminate absurdum
+            _ => (),
+        };
+        self.handle_expression_box_event(code, handler);
+    }
+
+    fn listen_introduce(&mut self, code: &KeyCode) {
+        match code {
+            KeyCode::Char('a') => {
+                self.state = State::AbsurdumState(AbsurdumState::IntroduceGetAssumption1)
+            }
+            _ => (),
         }
     }
 
     fn listen_add_subproof(&mut self, code: &KeyCode) {
-        let handler = |app_context: &mut App, result: parser::Result| match result {
-            parser::Result::Failure => app_context
-                .info_buffer
-                .push_str("Expression entered is invalid"),
-            parser::Result::Success(expr, _) => {
-                app_context.model.add_subproof(&expr);
-                app_context.state = State::Noraml;
-                app_context.expression_buffer.clear();
-                app_context.expression_cursor = 0;
+        let handler = |app_context: &mut App| {
+            let buf = app_context.expression_buffer.clone();
+            match parse_expression(&buf) {
+                parser::Result::Failure => app_context
+                    .info_buffer
+                    .push_str("Expression entered is invalid"),
+                parser::Result::Success(expr, _) => {
+                    app_context.model.add_subproof(&expr);
+                    app_context.state = State::Noraml;
+                    app_context.reset_expression_box();
+                }
             }
         };
-
         self.handle_expression_box_event(code, handler);
     }
 
     fn listen_add_assumption(&mut self, code: &KeyCode) {
-        let handler = |app_context: &mut App, result: parser::Result| match result {
-            parser::Result::Failure => app_context
-                .info_buffer
-                .push_str("Expression entered is invalid"),
-            parser::Result::Success(expr, _) => {
-                app_context.model.add_assumption(&expr);
-                app_context.state = State::Noraml;
-                app_context.expression_buffer.clear();
-                app_context.expression_cursor = 0;
+        let handler = |app_context: &mut App| {
+            let buf = app_context.expression_buffer.clone();
+            match parse_expression(&buf) {
+                parser::Result::Failure => app_context
+                    .info_buffer
+                    .push_str("Expression entered is invalid"),
+                parser::Result::Success(expr, _) => {
+                    app_context.model.add_assumption(&expr);
+                    app_context.state = State::Noraml;
+                    app_context.reset_expression_box();
+                }
             }
         };
-
         self.handle_expression_box_event(code, handler);
     }
 
@@ -113,20 +171,17 @@ impl App {
         }
     }
 
+    fn reset_expression_box(&mut self) {
+        self.expression_buffer.clear();
+        self.expression_cursor = 0;
+    }
+
     // Not sure if it avoids much code duplication. It also requires a clone thus another
     // allocation. If it starts to become bothersome just revert this code section to
     // 103cd74bd33e8bb550512cb745b2ff6bf89e35e1
-    fn handle_expression_box_event(
-        &mut self,
-        code: &KeyCode,
-        mut handler: impl FnMut(&mut App, parser::Result),
-    ) {
+    fn handle_expression_box_event(&mut self, code: &KeyCode, mut handler: impl FnMut(&mut App)) {
         match code {
-            KeyCode::Enter => {
-                let buf = self.expression_buffer.clone();
-                let res = parse_expression(&buf);
-                handler(self, res);
-            }
+            KeyCode::Enter => handler(self),
             KeyCode::Backspace if !self.expression_buffer.is_empty() => {
                 if self.expression_cursor > 0 {
                     self.expression_buffer
@@ -152,7 +207,7 @@ impl App {
 
     fn info_text(&self) -> String {
         match self.state {
-            State::Noraml => [
+            State::Noraml if !self.warning => [
                 "[i]ntroduce",
                 "[e]liminate",
                 "add [a]ssumption",
@@ -163,9 +218,12 @@ impl App {
             ]
             .join("   ")
             .to_string(),
-            State::AddAssumption => self.info_buffer.clone(),
-            State::AddSubproof => self.info_buffer.clone(),
-            _ => "".to_string(),
+            State::IntroduceChoice => {
+                ["[a]bsurdum", "a[n]d", "[o]r", "no[t]", "[i]mplies", "i[f]f"]
+                    .join("    ")
+                    .to_string()
+            }
+            _ => self.info_buffer.clone(),
         }
     }
 }
