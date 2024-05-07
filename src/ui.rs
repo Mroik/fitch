@@ -86,8 +86,8 @@ fn expression_box_area(whole: Rect) -> Rect {
     let temp = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(whole.height / 2 - 1),
-            Constraint::Length(1),
+            Constraint::Length(whole.height / 2 - 3),
+            Constraint::Length(3),
             Constraint::Length(whole.height / 2),
         ])
         .split(whole)[1];

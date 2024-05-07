@@ -6,7 +6,7 @@ use crate::{
     ui::Renderer,
 };
 
-struct App {
+pub struct App {
     model: Fitch,
     renderer: Renderer,
     state: State,
@@ -15,7 +15,7 @@ struct App {
 }
 
 impl App {
-    fn new() -> std::io::Result<App> {
+    pub fn new() -> std::io::Result<App> {
         let mut app = App {
             model: Fitch::new(),
             renderer: Renderer::new()?,
@@ -38,7 +38,7 @@ impl App {
         }
     }
 
-    fn listen(&mut self) {
+    pub fn listen(&mut self) {
         loop {
             if self.state == State::Quit {
                 break;

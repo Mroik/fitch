@@ -3,6 +3,9 @@ mod fitch;
 mod parser;
 mod ui;
 
+use app::App;
+
 fn main() {
-    println!("Hello, world!");
+    let mut app = App::new().unwrap();
+    app.listen();
 }
