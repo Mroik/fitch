@@ -34,20 +34,24 @@ impl App {
         let (title, render_box) = match self.state {
             State::AddAssumption => ("Assumption expression", true),
             State::AddSubproof => ("Subproof expression", true),
-            State::AbsurdumState(AbsurdumState::EliminateGetProposition(_)) => {
+            State::AbsurdumState(AbsurdumState::EliminateGetProposition(_))
+            | State::OrState(OrState::IntroduceGetProposition(_)) => {
                 ("Expression to introduce", true)
             }
             State::AbsurdumState(_) => ("Assumption index", true),
             State::AndState(AndState::IntroduceGetLeftAssumption)
-            | State::AndState(AndState::IntroduceGetRightAssumption(_)) => {
-                ("Assumption index to use", true)
-            }
-            State::AndState(AndState::EliminateGetAssumption) => {
+            | State::AndState(AndState::IntroduceGetRightAssumption(_))
+            | State::OrState(OrState::IntroduceGetAssumption) => ("Assumption index to use", true),
+            State::AndState(AndState::EliminateGetAssumption)
+            | State::OrState(OrState::EliminateGetAssumption) => {
                 ("And expression to eliminate", true)
             }
             State::AndState(AndState::EliminateGetProposition(_)) => {
                 ("And assumption to use", true)
             }
+            State::OrState(OrState::EliminateGetLeftSubproof(_))
+            | State::OrState(OrState::EliminateGetRightSubproof(_, _)) => ("Subproof to use", true),
+            State::Reiterate => ("Select proposition to reiterate", true),
             _ => ("", false),
         };
 
@@ -76,10 +80,12 @@ impl App {
                     State::Noraml => self.listen_normal(&key.code),
                     State::AddAssumption => self.listen_add_assumption(&key.code),
                     State::AddSubproof => self.listen_add_subproof(&key.code),
+                    State::Reiterate => self.listen_reiterate(&key.code),
                     State::IntroduceChoice => self.listen_introduce(&key.code),
                     State::EliminateChoice => self.listen_eliminate(&key.code),
                     State::AbsurdumState(_) => self.listen_absurdum(&key.code),
                     State::AndState(_) => self.listen_and(&key.code),
+                    State::OrState(_) => self.listen_or(&key.code),
                     _ => todo!(),
                 }
             }
@@ -88,6 +94,108 @@ impl App {
             self.info_buffer.clear();
             self.warning = false;
         }
+    }
+
+    fn listen_reiterate(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.expression_buffer.parse() {
+            Err(_) => {
+                app_context
+                    .info_buffer
+                    .push_str("The input value is not a valid index");
+            }
+            Ok(i) => {
+                if !app_context.model.reiterate(i) {
+                    app_context.info_buffer.push_str("Invalid index");
+                    app_context.warning = true;
+                }
+                app_context.state = State::Noraml;
+                app_context.reset_expression_box();
+            }
+        };
+        self.handle_expression_box_event(code, handler);
+    }
+
+    fn listen_or(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.state {
+            State::OrState(OrState::IntroduceGetAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(ass) => {
+                        app_context.state = State::OrState(OrState::IntroduceGetProposition(ass));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::OrState(OrState::IntroduceGetProposition(ass)) => {
+                match parse_expression(&app_context.expression_buffer) {
+                    parser::Result::Failure => app_context
+                        .info_buffer
+                        .push_str("The input expression is not valid"),
+                    parser::Result::Success(ris, _) => {
+                        if !app_context.model.introduce_or(ass, &ris) {
+                            app_context.info_buffer.push_str(
+                                "Select the left or right prop used in the input expression",
+                            );
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::OrState(OrState::EliminateGetAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(ass) => {
+                        app_context.state = State::OrState(OrState::EliminateGetLeftSubproof(ass));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::OrState(OrState::EliminateGetLeftSubproof(ass)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(left) => {
+                        app_context.state =
+                            State::OrState(OrState::EliminateGetRightSubproof(ass, left));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::OrState(OrState::EliminateGetRightSubproof(ass, left)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(right) => {
+                        if !app_context.model.eliminate_or(ass, left, right) {
+                            app_context
+                                .info_buffer
+                                .push_str("Select the or to eliminate then the 2 subproofs");
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            _ => (),
+        };
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_and(&mut self, code: &KeyCode) {
@@ -241,6 +349,7 @@ impl App {
                 self.state = State::AbsurdumState(AbsurdumState::EliminateGetAssumption)
             }
             KeyCode::Char('n') => self.state = State::AndState(AndState::EliminateGetAssumption),
+            KeyCode::Char('o') => self.state = State::OrState(OrState::EliminateGetAssumption),
             _ => (),
         }
     }
@@ -254,6 +363,7 @@ impl App {
             KeyCode::Char('n') => {
                 self.state = State::AndState(AndState::IntroduceGetLeftAssumption)
             }
+            KeyCode::Char('o') => self.state = State::OrState(OrState::IntroduceGetAssumption),
             _ => (),
         }
     }
@@ -299,6 +409,7 @@ impl App {
             KeyCode::Char('a') => self.state = State::AddAssumption,
             KeyCode::Char('s') => self.state = State::AddSubproof,
             KeyCode::Char('n') => self.model.end_subproof(),
+            KeyCode::Char('r') => self.state = State::Reiterate,
             KeyCode::Char('d') => self.model.delete_last_row(),
             KeyCode::Char('q') => self.state = State::Quit,
             _ => (),
@@ -324,7 +435,8 @@ impl App {
                 }
             }
             KeyCode::Char(c) => {
-                self.expression_buffer.push(*c);
+                self.expression_buffer
+                    .insert(self.expression_cursor as usize, *c);
                 self.expression_cursor += 1;
             }
             KeyCode::Esc => {
@@ -347,6 +459,7 @@ impl App {
                 "add [a]ssumption",
                 "add [s]ubproof",
                 "e[n]d subproof",
+                "[r]eiterate",
                 "[d]elete last row",
                 "[q]uit",
             ]
@@ -369,6 +482,7 @@ enum State {
     EliminateChoice,
     AddAssumption,
     AddSubproof,
+    Reiterate,
     AbsurdumState(AbsurdumState),
     AndState(AndState),
     OrState(OrState),

@@ -123,9 +123,21 @@ impl Display for Fitch {
                 }
                 res.push_str(format!("{} | ", i).as_str());
 
+                let is_sub = match expression {
+                    FitchComponent::Assumption(_) => true,
+                    _ => false,
+                };
+
+                if is_sub {
+                    res.push('-');
+                }
                 for _ in 0..*level {
                     res.push_str("    ");
                 }
+                if is_sub {
+                    res.pop();
+                }
+
                 res.push_str(expression.unwrap().to_string().as_str());
                 res.push_str("\n");
             });
@@ -145,7 +157,7 @@ impl Fitch {
     pub fn add_assumption(&mut self, prop: &Rc<Proposition>) {
         self.statements.insert(
             self.start_of_deductions,
-            (0, FitchComponent::Assumption(prop.clone())),
+            (0, FitchComponent::Deduction(prop.clone())),
         );
         self.start_of_deductions += 1;
     }
@@ -231,13 +243,21 @@ impl Fitch {
         None
     }
 
-    pub fn reiterate(&mut self, row: usize) {
+    pub fn reiterate(&mut self, row: usize) -> bool {
         if row >= self.statements.len() {
-            return;
+            return false;
         }
 
         let a = self.statements.get(row).unwrap();
-        self.statements.push((self.current_level, a.1.clone()));
+        if a.0 > self.current_level {
+            return false;
+        }
+
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(a.1.unwrap().clone()),
+        ));
+        true
     }
 
     pub fn introduce_or(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
@@ -246,10 +266,18 @@ impl Fitch {
             None => return false,
         };
 
-        let ris = Proposition::new_or(assum, prop);
-        self.statements
-            .push((self.current_level, FitchComponent::Deduction(ris)));
-        true
+        match prop.borrow() {
+            Proposition::Or(left, right) => {
+                if assum == left || assum == right {
+                    self.statements
+                        .push((self.current_level, FitchComponent::Deduction(prop.clone())));
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 
     // This prolly has some bugs
@@ -525,11 +553,17 @@ mod tests {
         let t0 = Proposition::new_term("A");
         let t1 = Proposition::new_term("B");
         fitch.add_assumption(&t0);
-        let ris = fitch.introduce_or(0, &t1);
+        let mut ris = fitch.introduce_or(0, &Proposition::new_or(&t0, &t1));
         assert!(ris);
         assert_eq!(
-            *fitch.statements.get(1).unwrap().1.unwrap(),
-            Proposition::new_or(&t0, &t1)
+            fitch.statements.get(1).unwrap().1.unwrap(),
+            &Proposition::new_or(&t0, &t1)
+        );
+        ris = fitch.introduce_or(0, &Proposition::new_or(&t1, &t0));
+        assert!(ris);
+        assert_eq!(
+            fitch.statements.get(2).unwrap().1.unwrap(),
+            &Proposition::new_or(&t1, &t0)
         );
     }
 
