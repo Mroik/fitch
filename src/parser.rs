@@ -194,7 +194,7 @@ fn parse_iff(queue: &str) -> Result {
 
 pub fn parse_expression(queue: &str) -> Result {
     let queue = queue.trim_start();
-    [
+    let result = [
         parse_term,
         parse_and,
         parse_or,
@@ -203,10 +203,16 @@ pub fn parse_expression(queue: &str) -> Result {
         parse_iff,
     ]
     .iter()
-    .fold(parse_absurdum(queue), |acc, func| match acc {
-        Result::Success(_, _) => acc,
-        Result::Failure => func(queue),
-    })
+    .map(|func| func(queue))
+    .find(|r| match r {
+        Result::Success(_, _) => true,
+        Result::Failure => false,
+    });
+
+    match result {
+        None => Result::Failure,
+        Some(r) => r,
+    }
 }
 
 #[cfg(test)]
