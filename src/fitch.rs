@@ -190,21 +190,25 @@ impl Fitch {
         true
     }
 
-    pub fn eliminate_and(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
+    pub fn eliminate_and(&mut self, assum: usize, other: usize) -> bool {
         let assum = match self.statements.get(assum) {
+            Some(v) => v.1.unwrap(),
+            None => return false,
+        };
+        let other = match self.statements.get(other) {
             Some(v) => v.1.unwrap(),
             None => return false,
         };
 
         match assum.borrow() {
-            Proposition::And(left, _) if left == prop => {
-                self.statements
-                    .push((self.current_level, FitchComponent::Deduction(left.clone())));
-                true
-            }
-            Proposition::And(_, right) if right == prop => {
+            Proposition::And(left, right) if left == other => {
                 self.statements
                     .push((self.current_level, FitchComponent::Deduction(right.clone())));
+                true
+            }
+            Proposition::And(left, right) if right == other => {
+                self.statements
+                    .push((self.current_level, FitchComponent::Deduction(left.clone())));
                 true
             }
             _ => false,
@@ -505,10 +509,14 @@ mod tests {
         let t1 = Proposition::new_term("B");
         let prop = Proposition::new_and(&t0, &t1);
         fitch.add_assumption(&prop);
-        let ris = fitch.eliminate_and(0, &Proposition::new_term("A"));
+        fitch.add_assumption(&t0);
+        fitch.add_assumption(&t1);
+        let ris = fitch.eliminate_and(0, 1);
         assert!(ris);
-        let ris = fitch.eliminate_and(0, &Proposition::new_term("C"));
-        assert!(!ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
+        let ris = fitch.eliminate_and(0, 2);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t0);
     }
 
     #[test]

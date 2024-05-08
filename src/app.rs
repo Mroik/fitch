@@ -34,9 +34,23 @@ impl App {
         let (title, render_box) = match self.state {
             State::AddAssumption => ("Assumption expression", true),
             State::AddSubproof => ("Subproof expression", true),
+            State::AbsurdumState(AbsurdumState::EliminateGetProposition(_)) => {
+                ("Expression to introduce", true)
+            }
             State::AbsurdumState(_) => ("Assumption index", true),
+            State::AndState(AndState::IntroduceGetLeftAssumption)
+            | State::AndState(AndState::IntroduceGetRightAssumption(_)) => {
+                ("Assumption index to use", true)
+            }
+            State::AndState(AndState::EliminateGetAssumption) => {
+                ("And expression to eliminate", true)
+            }
+            State::AndState(AndState::EliminateGetProposition(_)) => {
+                ("And assumption to use", true)
+            }
             _ => ("", false),
         };
+
         self.renderer.render(
             &self.model,
             &self.info_text(),
@@ -65,6 +79,7 @@ impl App {
                     State::IntroduceChoice => self.listen_introduce(&key.code),
                     State::EliminateChoice => self.listen_eliminate(&key.code),
                     State::AbsurdumState(_) => self.listen_absurdum(&key.code),
+                    State::AndState(_) => self.listen_and(&key.code),
                     _ => todo!(),
                 }
             }
@@ -73,6 +88,79 @@ impl App {
             self.info_buffer.clear();
             self.warning = false;
         }
+    }
+
+    fn listen_and(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.state {
+            State::AndState(AndState::IntroduceGetLeftAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(left) => {
+                        app_context.state =
+                            State::AndState(AndState::IntroduceGetRightAssumption(left));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::AndState(AndState::IntroduceGetRightAssumption(left)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(right) => {
+                        if !app_context.model.introduce_and(left, right) {
+                            app_context
+                                .info_buffer
+                                .push_str("Selected assumptions are not valid");
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::AndState(AndState::EliminateGetAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(left) => {
+                        app_context.state =
+                            State::AndState(AndState::EliminateGetProposition(left));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::AndState(AndState::EliminateGetProposition(left)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(right) => {
+                        if !app_context.model.eliminate_and(left, right) {
+                            app_context.info_buffer.push_str(
+                                "Select first the AND statement to eliminate, then the assumption",
+                            );
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            _ => unreachable!(),
+        };
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_absurdum(&mut self, code: &KeyCode) {
@@ -141,24 +229,30 @@ impl App {
                     }
                 }
             }
-            _ => (),
+            _ => unreachable!(),
         };
         self.handle_expression_box_event(code, handler);
     }
 
     fn listen_eliminate(&mut self, code: &KeyCode) {
         match code {
+            KeyCode::Esc => self.state = State::Noraml,
             KeyCode::Char('a') => {
                 self.state = State::AbsurdumState(AbsurdumState::EliminateGetAssumption)
             }
+            KeyCode::Char('n') => self.state = State::AndState(AndState::EliminateGetAssumption),
             _ => (),
         }
     }
 
     fn listen_introduce(&mut self, code: &KeyCode) {
         match code {
+            KeyCode::Esc => self.state = State::Noraml,
             KeyCode::Char('a') => {
                 self.state = State::AbsurdumState(AbsurdumState::IntroduceGetAssumption1)
+            }
+            KeyCode::Char('n') => {
+                self.state = State::AndState(AndState::IntroduceGetLeftAssumption)
             }
             _ => (),
         }
