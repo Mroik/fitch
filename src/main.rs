@@ -1,6 +1,7 @@
 mod app;
 mod fitch;
 mod parser;
+mod state;
 mod ui;
 
 use app::App;

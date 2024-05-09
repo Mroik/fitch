@@ -1,6 +1,7 @@
 use crate::{
     fitch::Fitch,
     parser::{self, parse_expression},
+    state::{AbsurdumState, AndState, ImpliesState, NotState, OrState, State},
     ui::Renderer,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -38,11 +39,11 @@ impl App {
             | State::OrState(OrState::IntroduceGetProposition(_)) => {
                 ("Expression to introduce", true)
             }
-            State::AbsurdumState(_) => ("Assumption index", true),
-            State::AndState(AndState::IntroduceGetLeftAssumption)
+            State::AbsurdumState(_)
+            | State::AndState(AndState::IntroduceGetLeftAssumption)
             | State::AndState(AndState::IntroduceGetRightAssumption(_))
             | State::OrState(OrState::IntroduceGetAssumption)
-            | State::NotState(_) => ("Assumption index to use", true),
+            | State::NotState(_) => ("Assumption index", true),
             State::AndState(AndState::EliminateGetAssumption)
             | State::OrState(OrState::EliminateGetAssumption) => {
                 ("And expression to eliminate", true)
@@ -51,8 +52,13 @@ impl App {
                 ("And assumption to use", true)
             }
             State::OrState(OrState::EliminateGetLeftSubproof(_))
-            | State::OrState(OrState::EliminateGetRightSubproof(_, _)) => ("Subproof to use", true),
+            | State::OrState(OrState::EliminateGetRightSubproof(_, _))
+            | State::ImpliesState(ImpliesState::Introduce) => ("Subproof to use", true),
             State::Reiterate => ("Select proposition to reiterate", true),
+            State::ImpliesState(ImpliesState::EliminateGetAssumption) => {
+                ("Implication to eliminate", true)
+            }
+            State::ImpliesState(ImpliesState::EliminateGetLeft(_)) => ("Index of the truth", true),
             _ => ("", false),
         };
 
@@ -88,6 +94,7 @@ impl App {
                     State::AndState(_) => self.listen_and(&key.code),
                     State::OrState(_) => self.listen_or(&key.code),
                     State::NotState(_) => self.listen_not(&key.code),
+                    State::ImpliesState(_) => self.listen_implies(&key.code),
                     _ => todo!(),
                 }
             }
@@ -96,6 +103,63 @@ impl App {
             self.info_buffer.clear();
             self.warning = false;
         }
+    }
+
+    fn listen_implies(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.state {
+            State::ImpliesState(ImpliesState::Introduce) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(subproof) => {
+                        if !app_context.model.introduce_implies(subproof) {
+                            app_context.info_buffer.push_str("Invalid subproof");
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::ImpliesState(ImpliesState::EliminateGetAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(to_elim) => {
+                        app_context.state =
+                            State::ImpliesState(ImpliesState::EliminateGetLeft(to_elim));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::ImpliesState(ImpliesState::EliminateGetLeft(to_elim)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(truth) => {
+                        if !app_context.model.eliminate_implies(to_elim, truth) {
+                            app_context
+                                .info_buffer
+                                .push_str("Choose the implication to eliminate then the truth");
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            _ => (),
+        };
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_not(&mut self, code: &KeyCode) {
@@ -394,6 +458,9 @@ impl App {
             KeyCode::Char('n') => self.state = State::AndState(AndState::EliminateGetAssumption),
             KeyCode::Char('o') => self.state = State::OrState(OrState::EliminateGetAssumption),
             KeyCode::Char('t') => self.state = State::NotState(NotState::Eliminate),
+            KeyCode::Char('i') => {
+                self.state = State::ImpliesState(ImpliesState::EliminateGetAssumption)
+            }
             _ => (),
         }
     }
@@ -409,6 +476,7 @@ impl App {
             }
             KeyCode::Char('o') => self.state = State::OrState(OrState::IntroduceGetAssumption),
             KeyCode::Char('t') => self.state = State::NotState(NotState::Introduce),
+            KeyCode::Char('i') => self.state = State::ImpliesState(ImpliesState::Introduce),
             _ => (),
         }
     }
@@ -518,67 +586,4 @@ impl App {
             _ => self.info_buffer.clone(),
         }
     }
-}
-
-#[derive(PartialEq)]
-enum State {
-    Noraml,
-    IntroduceChoice,
-    EliminateChoice,
-    AddAssumption,
-    AddSubproof,
-    Reiterate,
-    AbsurdumState(AbsurdumState),
-    AndState(AndState),
-    OrState(OrState),
-    NotState(NotState),
-    ImpliesState(ImpliesState),
-    IffState(IffState),
-    Quit,
-}
-
-#[derive(PartialEq)]
-enum AbsurdumState {
-    IntroduceGetAssumption1,
-    IntroduceGetAssumption2(usize),
-    EliminateGetAssumption,
-    EliminateGetProposition(usize),
-}
-
-#[derive(PartialEq)]
-enum AndState {
-    IntroduceGetLeftAssumption,
-    IntroduceGetRightAssumption(usize),
-    EliminateGetAssumption,
-    EliminateGetProposition(usize),
-}
-
-#[derive(PartialEq)]
-enum OrState {
-    IntroduceGetAssumption,
-    IntroduceGetProposition(usize),
-    EliminateGetAssumption,
-    EliminateGetLeftSubproof(usize),
-    EliminateGetRightSubproof(usize, usize),
-}
-
-#[derive(PartialEq)]
-enum NotState {
-    Introduce,
-    Eliminate,
-}
-
-#[derive(PartialEq)]
-enum ImpliesState {
-    Introduce,
-    EliminateGetAssumption,
-    EliminateGetLeft(usize),
-}
-
-#[derive(PartialEq)]
-enum IffState {
-    IntroduceGetLeftSubproof,
-    IntroduceGetRightSubproof(usize),
-    EliminateGetAssumption,
-    EliminateGetTruth(usize),
 }
