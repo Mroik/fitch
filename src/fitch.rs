@@ -69,27 +69,42 @@ impl Proposition {
     }
 }
 
-#[derive(Clone)]
+enum Rule {
+    Reiter,
+    IntroAbs,
+    ElimAbs,
+    IntroAnd,
+    ElimAnd,
+    IntroOr,
+    ElimOr,
+    IntroNot,
+    ElimNot,
+    IntroImpl,
+    ElimImpl,
+    IntroIff,
+    ElimIff,
+}
+
 enum FitchComponent {
     Assumption(Rc<Proposition>),
-    Deduction(Rc<Proposition>),
+    Deduction(Rc<Proposition>, Rule, Vec<usize>),
 }
 
 impl FitchComponent {
     fn unwrap(&self) -> &Rc<Proposition> {
         match self {
             FitchComponent::Assumption(t) => t,
-            FitchComponent::Deduction(t) => t,
+            FitchComponent::Deduction(t, _, _) => t,
         }
     }
 }
 
-type Level = u32;
+type Level = usize;
 
 pub struct Fitch {
     statements: Vec<(Level, FitchComponent)>,
     start_of_deductions: usize,
-    current_level: u32,
+    current_level: usize,
 }
 
 impl Display for Fitch {
@@ -141,6 +156,37 @@ impl Display for Fitch {
                 }
 
                 res.push_str(expression.unwrap().to_string().as_str());
+                res.push(' ');
+                match expression {
+                    FitchComponent::Assumption(_) => (),
+                    FitchComponent::Deduction(_, r, ass) => {
+                        let sym = match r {
+                            Rule::Reiter => "    Re ",
+                            Rule::IntroAbs => "    I ⊥ ",
+                            Rule::ElimAbs => "    E ⊥ ",
+                            Rule::IntroAnd => "    I & ",
+                            Rule::ElimAnd => "    E & ",
+                            Rule::IntroOr => "    I | ",
+                            Rule::ElimOr => "    E | ",
+                            Rule::IntroNot => "    I ~ ",
+                            Rule::ElimNot => "    E ~ ",
+                            Rule::IntroImpl => "    I => ",
+                            Rule::ElimImpl => "    E => ",
+                            Rule::IntroIff => "    I <=> ",
+                            Rule::ElimIff => "    E <=> ",
+                        };
+                        res.push_str(sym);
+                        let mut assums = ass
+                            .iter()
+                            .map(|v| v.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ");
+                        assums.insert(0, '[');
+                        assums.push(']');
+                        res.push_str(&assums);
+                    }
+                }
+
                 res.push('\n');
             });
 
@@ -172,7 +218,7 @@ impl Fitch {
         }
 
         self.statements
-            .push((0, FitchComponent::Deduction(prop.clone())));
+            .push((0, FitchComponent::Assumption(prop.clone())));
         self.start_of_deductions += 1;
         true
     }
@@ -202,40 +248,46 @@ impl Fitch {
     }
 
     pub fn introduce_and(&mut self, left: usize, right: usize) -> bool {
-        let left = match self.statements.get(left) {
+        let left_x = match self.statements.get(left) {
             Some(v) => v,
             None => return false,
         };
-        let right = match self.statements.get(right) {
+        let right_x = match self.statements.get(right) {
             Some(v) => v,
             None => return false,
         };
 
-        let ris = Proposition::new_and(left.1.unwrap(), right.1.unwrap());
-        self.statements
-            .push((self.current_level, FitchComponent::Deduction(ris)));
+        let ris = Proposition::new_and(left_x.1.unwrap(), right_x.1.unwrap());
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(ris, Rule::IntroAnd, vec![left, right]),
+        ));
         true
     }
 
     pub fn eliminate_and(&mut self, assum: usize, other: usize) -> bool {
-        let assum = match self.statements.get(assum) {
+        let assum_x = match self.statements.get(assum) {
             Some(v) => v.1.unwrap(),
             None => return false,
         };
-        let other = match self.statements.get(other) {
+        let other_x = match self.statements.get(other) {
             Some(v) => v.1.unwrap(),
             None => return false,
         };
 
-        match assum.borrow() {
-            Proposition::And(left, right) if left == other => {
-                self.statements
-                    .push((self.current_level, FitchComponent::Deduction(right.clone())));
+        match assum_x.borrow() {
+            Proposition::And(left, right) if left == other_x => {
+                self.statements.push((
+                    self.current_level,
+                    FitchComponent::Deduction(right.clone(), Rule::ElimAnd, vec![assum, other]),
+                ));
                 true
             }
-            Proposition::And(left, right) if right == other => {
-                self.statements
-                    .push((self.current_level, FitchComponent::Deduction(left.clone())));
+            Proposition::And(left, right) if right == other_x => {
+                self.statements.push((
+                    self.current_level,
+                    FitchComponent::Deduction(left.clone(), Rule::ElimAnd, vec![assum, other]),
+                ));
                 true
             }
             _ => false,
@@ -254,22 +306,24 @@ impl Fitch {
 
         self.statements.push((
             self.current_level,
-            FitchComponent::Deduction(a.1.unwrap().clone()),
+            FitchComponent::Deduction(a.1.unwrap().clone(), Rule::Reiter, vec![row]),
         ));
         true
     }
 
     pub fn introduce_or(&mut self, assum: usize, prop: &Rc<Proposition>) -> bool {
-        let assum = match self.statements.get(assum) {
+        let assum_x = match self.statements.get(assum) {
             Some(v) => v.1.unwrap(),
             None => return false,
         };
 
         match prop.borrow() {
             Proposition::Or(left, right) => {
-                if assum == left || assum == right {
-                    self.statements
-                        .push((self.current_level, FitchComponent::Deduction(prop.clone())));
+                if assum_x == left || assum_x == right {
+                    self.statements.push((
+                        self.current_level,
+                        FitchComponent::Deduction(prop.clone(), Rule::IntroOr, vec![assum]),
+                    ));
                     true
                 } else {
                     false
@@ -306,7 +360,7 @@ impl Fitch {
             return false;
         }
 
-        let assum = match self.statements.get(assum) {
+        let assum_x = match self.statements.get(assum) {
             None => return false,
             Some((_, v)) => v.unwrap(),
         };
@@ -321,7 +375,7 @@ impl Fitch {
             Some((_, v)) => v.unwrap(),
         };
 
-        match assum.borrow() {
+        match assum_x.borrow() {
             Proposition::Or(ll, rr) => {
                 if !(ll == left_a && rr == right_a) {
                     return false;
@@ -337,7 +391,11 @@ impl Fitch {
         }
         self.statements.push((
             self.current_level,
-            FitchComponent::Deduction(left_sub.unwrap().clone()),
+            FitchComponent::Deduction(
+                left_sub.unwrap().clone(),
+                Rule::ElimOr,
+                vec![assum, left, right],
+            ),
         ));
         true
     }
@@ -360,7 +418,11 @@ impl Fitch {
 
         self.statements.push((
             self.current_level,
-            FitchComponent::Deduction(Proposition::new_absurdum()),
+            FitchComponent::Deduction(
+                Proposition::new_absurdum(),
+                Rule::IntroAbs,
+                vec![ass1, ass2],
+            ),
         ));
         true
     }
@@ -372,7 +434,7 @@ impl Fitch {
             {
                 self.statements.push((
                     self.current_level,
-                    FitchComponent::Deduction(introduce.clone()),
+                    FitchComponent::Deduction(introduce.clone(), Rule::ElimAbs, vec![absurdum]),
                 ));
                 true
             }
@@ -396,7 +458,7 @@ impl Fitch {
         let cur = self.statements.get(sub_proof).unwrap().1.unwrap();
         self.statements.push((
             self.current_level,
-            FitchComponent::Deduction(Proposition::new_not(cur)),
+            FitchComponent::Deduction(Proposition::new_not(cur), Rule::IntroNot, vec![sub_proof]),
         ));
         true
     }
@@ -415,8 +477,10 @@ impl Fitch {
             _ => return false,
         };
 
-        self.statements
-            .push((self.current_level, FitchComponent::Deduction(cur.clone())));
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(cur.clone(), Rule::ElimNot, vec![row]),
+        ));
         true
     }
 
@@ -436,25 +500,30 @@ impl Fitch {
 
         self.statements.push((
             self.current_level,
-            FitchComponent::Deduction(Proposition::new_implies(start, end)),
+            FitchComponent::Deduction(
+                Proposition::new_implies(start, end),
+                Rule::IntroImpl,
+                vec![sub_proof],
+            ),
         ));
         true
     }
 
     pub fn eliminate_implies(&mut self, assum: usize, left: usize) -> bool {
-        let assum = match self.statements.get(assum) {
+        let assum_x = match self.statements.get(assum) {
             None => return false,
             Some((_, v)) => v.unwrap(),
         };
-        let left = match self.statements.get(left) {
+        let left_x = match self.statements.get(left) {
             None => return false,
             Some((_, v)) => v.unwrap(),
         };
 
-        match assum.borrow() {
-            Proposition::Implies(l, r) if left == l => self
-                .statements
-                .push((self.current_level, FitchComponent::Deduction(r.clone()))),
+        match assum_x.borrow() {
+            Proposition::Implies(l, r) if left_x == l => self.statements.push((
+                self.current_level,
+                FitchComponent::Deduction(r.clone(), Rule::ElimImpl, vec![assum, left]),
+            )),
             _ => return false,
         }
         true
@@ -483,7 +552,11 @@ impl Fitch {
         }
         self.statements.push((
             self.current_level,
-            FitchComponent::Deduction(Proposition::new_iff(left_start, right_start)),
+            FitchComponent::Deduction(
+                Proposition::new_iff(left_start, right_start),
+                Rule::IntroIff,
+                vec![left_sub, right_sub],
+            ),
         ));
         true
     }
@@ -493,19 +566,21 @@ impl Fitch {
             None => return false,
             Some((_, v)) => v.unwrap(),
         };
-        let truth = match self.statements.get(truth) {
+        let truth_x = match self.statements.get(truth) {
             None => return false,
             Some((_, v)) => v.unwrap(),
         };
 
         let ris = match imp.borrow() {
-            Proposition::Iff(left, right) if left == truth => right,
-            Proposition::Iff(left, right) if right == truth => left,
+            Proposition::Iff(left, right) if left == truth_x => right,
+            Proposition::Iff(left, right) if right == truth_x => left,
             _ => return false,
         };
 
-        self.statements
-            .push((self.current_level, FitchComponent::Deduction(ris.clone())));
+        self.statements.push((
+            self.current_level,
+            FitchComponent::Deduction(ris.clone(), Rule::ElimIff, vec![assum, truth]),
+        ));
         true
     }
 }
