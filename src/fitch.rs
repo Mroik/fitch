@@ -96,11 +96,16 @@ impl Display for Fitch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut res = String::new();
         let mut temp = self.statements.len() as i32 - 1;
+        if temp == 0 {
+            temp = 1;
+        }
+
         let mut max = 0;
         while temp > 0 {
             temp /= 10;
             max += 1;
         }
+
         self.statements
             .iter()
             .enumerate()
@@ -138,6 +143,16 @@ impl Display for Fitch {
                 res.push_str(expression.unwrap().to_string().as_str());
                 res.push('\n');
             });
+
+        for _ in 0..max + 4 {
+            res.push(' ');
+        }
+
+        for _ in 0..self.current_level {
+            res.push_str("    ");
+        }
+
+        res.push_str("^\n");
         write!(f, "{}", res)
     }
 }
@@ -151,12 +166,15 @@ impl Fitch {
         }
     }
 
-    pub fn add_assumption(&mut self, prop: &Rc<Proposition>) {
-        self.statements.insert(
-            self.start_of_deductions,
-            (0, FitchComponent::Deduction(prop.clone())),
-        );
+    pub fn add_assumption(&mut self, prop: &Rc<Proposition>) -> bool {
+        if self.statements.len() > self.start_of_deductions {
+            return false;
+        }
+
+        self.statements
+            .push((0, FitchComponent::Deduction(prop.clone())));
         self.start_of_deductions += 1;
+        true
     }
 
     pub fn add_subproof(&mut self, prop: &Rc<Proposition>) {
@@ -178,7 +196,7 @@ impl Fitch {
             self.start_of_deductions = self.statements.len();
         }
         match self.statements.last() {
-            None => (),
+            None => self.current_level = 0,
             Some((l, _)) => self.current_level = *l,
         }
     }

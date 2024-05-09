@@ -100,7 +100,7 @@ impl App {
                     State::NotState(_) => self.listen_not(&key.code),
                     State::ImpliesState(_) => self.listen_implies(&key.code),
                     State::IffState(_) => self.listen_iff(&key.code),
-                    _ => todo!(),
+                    _ => unreachable!(),
                 }
             }
 
@@ -585,7 +585,12 @@ impl App {
                     .info_buffer
                     .push_str("Expression entered is invalid"),
                 parser::Result::Success(expr, _) => {
-                    app_context.model.add_assumption(&expr);
+                    if !app_context.model.add_assumption(&expr) {
+                        app_context
+                            .info_buffer
+                            .push_str("Delete all deductions before adding assumptions");
+                        app_context.warning = true;
+                    }
                     app_context.state = State::Noraml;
                     app_context.reset_expression_box();
                 }
