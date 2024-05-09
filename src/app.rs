@@ -41,7 +41,8 @@ impl App {
             State::AbsurdumState(_) => ("Assumption index", true),
             State::AndState(AndState::IntroduceGetLeftAssumption)
             | State::AndState(AndState::IntroduceGetRightAssumption(_))
-            | State::OrState(OrState::IntroduceGetAssumption) => ("Assumption index to use", true),
+            | State::OrState(OrState::IntroduceGetAssumption)
+            | State::NotState(_) => ("Assumption index to use", true),
             State::AndState(AndState::EliminateGetAssumption)
             | State::OrState(OrState::EliminateGetAssumption) => {
                 ("And expression to eliminate", true)
@@ -86,6 +87,7 @@ impl App {
                     State::AbsurdumState(_) => self.listen_absurdum(&key.code),
                     State::AndState(_) => self.listen_and(&key.code),
                     State::OrState(_) => self.listen_or(&key.code),
+                    State::NotState(_) => self.listen_not(&key.code),
                     _ => todo!(),
                 }
             }
@@ -94,6 +96,47 @@ impl App {
             self.info_buffer.clear();
             self.warning = false;
         }
+    }
+
+    fn listen_not(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.state {
+            State::NotState(NotState::Introduce) => match app_context.expression_buffer.parse() {
+                Err(_) => {
+                    app_context
+                        .info_buffer
+                        .push_str("The input value is not a valid index");
+                }
+                Ok(index) => {
+                    if !app_context.model.introduce_not(index) {
+                        app_context
+                            .info_buffer
+                            .push_str("Subproof assumption does not generate an absurdum");
+                        app_context.warning = true;
+                    }
+                    app_context.state = State::Noraml;
+                    app_context.reset_expression_box();
+                }
+            },
+            State::NotState(NotState::Eliminate) => match app_context.expression_buffer.parse() {
+                Err(_) => {
+                    app_context
+                        .info_buffer
+                        .push_str("The input value is not a valid index");
+                }
+                Ok(index) => {
+                    if !app_context.model.eliminate_not(index) {
+                        app_context
+                            .info_buffer
+                            .push_str("Expression selected is not a double negation");
+                        app_context.warning = true;
+                    }
+                    app_context.state = State::Noraml;
+                    app_context.reset_expression_box();
+                }
+            },
+            _ => (),
+        };
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_reiterate(&mut self, code: &KeyCode) {
@@ -350,6 +393,7 @@ impl App {
             }
             KeyCode::Char('n') => self.state = State::AndState(AndState::EliminateGetAssumption),
             KeyCode::Char('o') => self.state = State::OrState(OrState::EliminateGetAssumption),
+            KeyCode::Char('t') => self.state = State::NotState(NotState::Eliminate),
             _ => (),
         }
     }
@@ -364,6 +408,7 @@ impl App {
                 self.state = State::AndState(AndState::IntroduceGetLeftAssumption)
             }
             KeyCode::Char('o') => self.state = State::OrState(OrState::IntroduceGetAssumption),
+            KeyCode::Char('t') => self.state = State::NotState(NotState::Introduce),
             _ => (),
         }
     }
