@@ -51,7 +51,7 @@ fn parse_and(queue: &str) -> Result {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
             queue = rest.trim_start();
-            if queue.is_empty() || queue.chars().nth(0).unwrap() != '^' {
+            if queue.is_empty() || queue.chars().nth(0).unwrap() != '&' {
                 return Result::Failure;
             }
             queue = queue[1..].trim_start();
@@ -83,7 +83,7 @@ fn parse_or(queue: &str) -> Result {
         Result::Failure => Result::Failure,
         Result::Success(left, rest) => {
             queue = rest.trim_start();
-            if queue.is_empty() || queue.chars().nth(0).unwrap() != 'v' {
+            if queue.is_empty() || queue.chars().nth(0).unwrap() != '|' {
                 return Result::Failure;
             }
             queue = queue[1..].trim_start();
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn parse_and_test() {
-        let queue = "  (A ^ B)  ";
+        let queue = "  (A & B)  ";
         let a = Proposition::new_term("A");
         let b = Proposition::new_term("B");
         match parse_and(queue) {
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn parse_or_test() {
-        let queue = "  (A v B)  ";
+        let queue = "  (A | B)  ";
         let a = Proposition::new_term("A");
         let b = Proposition::new_term("B");
         match parse_or(queue) {
@@ -323,7 +323,7 @@ mod tests {
         let left = Proposition::new_or(&a, &b);
         let right = Proposition::new_and(&a, &b);
         let ris = Proposition::new_and(&left, &right);
-        let queue = "  ((A v B) ^ (A ^ B))  ";
+        let queue = "  ((A | B) & (A & B))  ";
         match parse_expression(queue) {
             Result::Failure => assert!(false),
             Result::Success(p, rest) => {

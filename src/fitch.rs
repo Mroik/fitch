@@ -16,9 +16,9 @@ impl Display for Proposition {
         match self {
             Self::Absurdum => write!(f, "⊥"),
             Self::Term(name) => write!(f, "{}", name),
-            Self::And(left, right) => write!(f, "({} ^ {})", left, right),
-            Self::Or(left, right) => write!(f, "({} v {})", left, right),
-            Self::Not(t) => write!(f, "(!{})", t),
+            Self::And(left, right) => write!(f, "({} & {})", left, right),
+            Self::Or(left, right) => write!(f, "({} | {})", left, right),
+            Self::Not(t) => write!(f, "(~{})", t),
             Self::Implies(left, right) => write!(f, "({} => {})", left, right),
             Self::Iff(left, right) => write!(f, "({} <=> {})", left, right),
         }
