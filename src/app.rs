@@ -1,7 +1,7 @@
 use crate::{
     fitch::Fitch,
     parser::{self, parse_expression},
-    state::{AbsurdumState, AndState, ImpliesState, NotState, OrState, State},
+    state::{AbsurdumState, AndState, IffState, ImpliesState, NotState, OrState, State},
     ui::Renderer,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -53,12 +53,16 @@ impl App {
             }
             State::OrState(OrState::EliminateGetLeftSubproof(_))
             | State::OrState(OrState::EliminateGetRightSubproof(_, _))
-            | State::ImpliesState(ImpliesState::Introduce) => ("Subproof to use", true),
+            | State::ImpliesState(ImpliesState::Introduce)
+            | State::IffState(IffState::IntroduceGetLeftSubproof)
+            | State::IffState(IffState::IntroduceGetRightSubproof(_)) => ("Subproof to use", true),
             State::Reiterate => ("Select proposition to reiterate", true),
-            State::ImpliesState(ImpliesState::EliminateGetAssumption) => {
+            State::ImpliesState(ImpliesState::EliminateGetAssumption)
+            | State::IffState(IffState::EliminateGetAssumption) => {
                 ("Implication to eliminate", true)
             }
-            State::ImpliesState(ImpliesState::EliminateGetLeft(_)) => ("Index of the truth", true),
+            State::ImpliesState(ImpliesState::EliminateGetLeft(_))
+            | State::IffState(IffState::EliminateGetTruth(_)) => ("Index of the truth", true),
             _ => ("", false),
         };
 
@@ -95,6 +99,7 @@ impl App {
                     State::OrState(_) => self.listen_or(&key.code),
                     State::NotState(_) => self.listen_not(&key.code),
                     State::ImpliesState(_) => self.listen_implies(&key.code),
+                    State::IffState(_) => self.listen_iff(&key.code),
                     _ => todo!(),
                 }
             }
@@ -103,6 +108,78 @@ impl App {
             self.info_buffer.clear();
             self.warning = false;
         }
+    }
+
+    fn listen_iff(&mut self, code: &KeyCode) {
+        let handler = |app_context: &mut App| match app_context.state {
+            State::IffState(IffState::IntroduceGetLeftSubproof) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(left) => {
+                        app_context.state =
+                            State::IffState(IffState::IntroduceGetRightSubproof(left));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::IffState(IffState::IntroduceGetRightSubproof(left)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(right) => {
+                        if !app_context.model.introduce_iff(left, right) {
+                            app_context
+                                .info_buffer
+                                .push_str("Select the left subproof then the right subproof");
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::IffState(IffState::EliminateGetAssumption) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(to_elim) => {
+                        app_context.state = State::IffState(IffState::EliminateGetTruth(to_elim));
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            State::IffState(IffState::EliminateGetTruth(to_elim)) => {
+                match app_context.expression_buffer.parse() {
+                    Err(_) => {
+                        app_context
+                            .info_buffer
+                            .push_str("The input value is not a valid index");
+                    }
+                    Ok(truth) => {
+                        if !app_context.model.eliminate_iff(to_elim, truth) {
+                            app_context.info_buffer.push_str(
+                                "Choose the double implication to eliminate then the truth",
+                            );
+                            app_context.warning = true;
+                        }
+                        app_context.state = State::Noraml;
+                        app_context.reset_expression_box();
+                    }
+                }
+            }
+            _ => (),
+        };
+        self.handle_expression_box_event(code, handler);
     }
 
     fn listen_implies(&mut self, code: &KeyCode) {
@@ -461,6 +538,7 @@ impl App {
             KeyCode::Char('i') => {
                 self.state = State::ImpliesState(ImpliesState::EliminateGetAssumption)
             }
+            KeyCode::Char('f') => self.state = State::IffState(IffState::EliminateGetAssumption),
             _ => (),
         }
     }
@@ -477,6 +555,7 @@ impl App {
             KeyCode::Char('o') => self.state = State::OrState(OrState::IntroduceGetAssumption),
             KeyCode::Char('t') => self.state = State::NotState(NotState::Introduce),
             KeyCode::Char('i') => self.state = State::ImpliesState(ImpliesState::Introduce),
+            KeyCode::Char('f') => self.state = State::IffState(IffState::IntroduceGetLeftSubproof),
             _ => (),
         }
     }
