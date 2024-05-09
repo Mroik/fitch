@@ -227,22 +227,6 @@ impl Fitch {
         }
     }
 
-    // This prolly has some bugs
-    fn find_sub_assum(&self, row: usize) -> Option<usize> {
-        let level = match self.statements.get(row) {
-            None => return None,
-            Some((l, _)) => *l,
-        };
-        let cur = row - 1;
-        while cur < row {
-            match self.statements.get(cur).unwrap() {
-                (l, FitchComponent::Assumption(_)) if *l == level => return Some(cur),
-                _ => continue,
-            }
-        }
-        None
-    }
-
     pub fn reiterate(&mut self, row: usize) -> bool {
         if row >= self.statements.len() {
             return false;
