@@ -110,7 +110,7 @@ impl Display for Fitch {
                 }
 
                 res.push(' ');
-                let mut temp = i as i32;
+                let mut temp = if i == 0 { 1 } else { i as i32 };
                 let mut white = 0;
                 while temp > 0 {
                     temp = temp / 10;
