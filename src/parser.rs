@@ -195,6 +195,7 @@ fn parse_iff(queue: &str) -> Result {
 pub fn parse_expression(queue: &str) -> Result {
     let queue = queue.trim_start();
     let result = [
+        parse_absurdum,
         parse_term,
         parse_and,
         parse_or,
