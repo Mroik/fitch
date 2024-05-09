@@ -98,7 +98,7 @@ impl Display for Fitch {
         let mut temp = self.statements.len() as i32 - 1;
         let mut max = 0;
         while temp > 0 {
-            temp = temp / 10;
+            temp /= 10;
             max += 1;
         }
         self.statements
@@ -113,7 +113,7 @@ impl Display for Fitch {
                 let mut temp = if i == 0 { 1 } else { i as i32 };
                 let mut white = 0;
                 while temp > 0 {
-                    temp = temp / 10;
+                    temp /= 10;
                     white += 1;
                 }
 
@@ -123,10 +123,7 @@ impl Display for Fitch {
                 }
                 res.push_str(format!("{} | ", i).as_str());
 
-                let is_sub = match expression {
-                    FitchComponent::Assumption(_) => true,
-                    _ => false,
-                };
+                let is_sub = matches!(expression, FitchComponent::Assumption(_));
 
                 if is_sub {
                     res.push('-');
@@ -139,7 +136,7 @@ impl Display for Fitch {
                 }
 
                 res.push_str(expression.unwrap().to_string().as_str());
-                res.push_str("\n");
+                res.push('\n');
             });
         write!(f, "{}", res)
     }
@@ -283,7 +280,7 @@ impl Fitch {
             }
             return Some(self.statements.get(x).unwrap().1.unwrap());
         }
-        return None;
+        None
     }
 
     pub fn eliminate_or(&mut self, assum: usize, left: usize, right: usize) -> bool {

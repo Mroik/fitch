@@ -65,7 +65,7 @@ impl Renderer {
                         .title(title),
                 );
                 frame.render_widget(expression_widget, area);
-                frame.set_cursor(area.left() + 1 + cursor_offset as u16, area.top() + 1);
+                frame.set_cursor(area.left() + 1 + cursor_offset, area.top() + 1);
             })
             .unwrap();
     }
