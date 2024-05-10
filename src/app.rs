@@ -49,7 +49,7 @@ impl App {
                 ("And expression to eliminate", true)
             }
             State::AndState(AndState::EliminateGetProposition(_)) => {
-                ("And assumption to use", true)
+                ("Resulting expression", true)
             }
             State::OrState(OrState::EliminateGetLeftSubproof(_))
             | State::OrState(OrState::EliminateGetRightSubproof(_, _))
@@ -431,18 +431,16 @@ impl App {
                     }
                 }
             }
-            State::AndState(AndState::EliminateGetProposition(left)) => {
-                match app_context.expression_buffer.parse() {
-                    Err(_) => {
-                        app_context
-                            .info_buffer
-                            .push_str("The input value is not a valid index");
-                    }
-                    Ok(right) => {
-                        if !app_context.model.eliminate_and(left, right) {
-                            app_context.info_buffer.push_str(
-                                "Select first the AND statement to eliminate, then the assumption",
-                            );
+            State::AndState(AndState::EliminateGetProposition(assum)) => {
+                match parse_expression(&app_context.expression_buffer) {
+                    parser::Result::Failure => app_context
+                        .info_buffer
+                        .push_str("Expression entered is invalid"),
+                    parser::Result::Success(r, _) => {
+                        if !app_context.model.eliminate_and(assum, &r) {
+                            app_context
+                                .info_buffer
+                                .push_str("Input expression is neither left or right prop in AND");
                             app_context.warning = true;
                         }
                         app_context.state = State::Noraml;

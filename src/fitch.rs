@@ -265,28 +265,24 @@ impl Fitch {
         true
     }
 
-    pub fn eliminate_and(&mut self, assum: usize, other: usize) -> bool {
+    pub fn eliminate_and(&mut self, assum: usize, new_exp: &Rc<Proposition>) -> bool {
         let assum_x = match self.statements.get(assum) {
-            Some(v) => v.1.unwrap(),
-            None => return false,
-        };
-        let other_x = match self.statements.get(other) {
             Some(v) => v.1.unwrap(),
             None => return false,
         };
 
         match assum_x.borrow() {
-            Proposition::And(left, right) if left == other_x => {
+            Proposition::And(left, _) if left == new_exp => {
                 self.statements.push((
                     self.current_level,
-                    FitchComponent::Deduction(right.clone(), Rule::ElimAnd, vec![assum, other]),
+                    FitchComponent::Deduction(left.clone(), Rule::ElimAnd, vec![assum]),
                 ));
                 true
             }
-            Proposition::And(left, right) if right == other_x => {
+            Proposition::And(_, right) if right == new_exp => {
                 self.statements.push((
                     self.current_level,
-                    FitchComponent::Deduction(left.clone(), Rule::ElimAnd, vec![assum, other]),
+                    FitchComponent::Deduction(right.clone(), Rule::ElimAnd, vec![assum]),
                 ));
                 true
             }
@@ -611,14 +607,12 @@ mod tests {
         let t1 = Proposition::new_term("B");
         let prop = Proposition::new_and(&t0, &t1);
         fitch.add_assumption(&prop);
-        fitch.add_assumption(&t0);
-        fitch.add_assumption(&t1);
-        let ris = fitch.eliminate_and(0, 1);
-        assert!(ris);
-        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
-        let ris = fitch.eliminate_and(0, 2);
+        let ris = fitch.eliminate_and(0, &t0);
         assert!(ris);
         assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t0);
+        let ris = fitch.eliminate_and(0, &t1);
+        assert!(ris);
+        assert_eq!(fitch.statements.last().unwrap().1.unwrap(), &t1);
     }
 
     #[test]
