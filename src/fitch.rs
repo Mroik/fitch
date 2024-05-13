@@ -121,6 +121,13 @@ impl Display for Fitch {
             max += 1;
         }
 
+        let longest_row = self
+            .statements
+            .iter()
+            .map(|(level, comp)| comp.unwrap().to_string().chars().count() + level * 4)
+            .max()
+            .unwrap_or(0);
+
         self.statements
             .iter()
             .enumerate()
@@ -155,8 +162,14 @@ impl Display for Fitch {
                     res.pop();
                 }
 
-                res.push_str(expression.unwrap().to_string().as_str());
-                res.push(' ');
+                let exp_str = expression.unwrap().to_string();
+                res.push_str(exp_str.as_str());
+
+                let to_add = longest_row - (exp_str.chars().count() + level * 4);
+                for _ in 0..to_add {
+                    res.push(' ');
+                }
+
                 match expression {
                     FitchComponent::Assumption(_) => (),
                     FitchComponent::Deduction(_, r, ass) => {
