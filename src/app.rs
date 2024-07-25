@@ -48,9 +48,7 @@ impl App {
             | State::OrState(OrState::EliminateGetAssumption) => {
                 ("And expression to eliminate", true)
             }
-            State::AndState(AndState::EliminateGetProposition(_)) => {
-                ("Resulting expression", true)
-            }
+            State::AndState(AndState::EliminateGetProposition(_)) => ("Resulting expression", true),
             State::OrState(OrState::EliminateGetLeftSubproof(_))
             | State::OrState(OrState::EliminateGetRightSubproof(_, _))
             | State::ImpliesState(ImpliesState::Introduce)

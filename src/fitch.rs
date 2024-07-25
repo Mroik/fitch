@@ -556,6 +556,12 @@ impl Fitch {
             Some(v) => v,
         };
 
+        if self.current_level != self.statements.get(left_sub).unwrap().0 - 1
+            || self.current_level != self.statements.get(right_sub).unwrap().0 - 1
+        {
+            return false;
+        }
+
         if !(left_start == right_end && left_end == right_start) {
             return false;
         }
